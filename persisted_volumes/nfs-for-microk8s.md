@@ -5,7 +5,7 @@
 > [!WARNING]
 > The below steps including running a container image with the `--privileged` parameter which is a HIGH SECURITY RISK. It is intended to use short term for local testing of persisted volumes. It is highly recommended that you stop and delete the container after you conclude your own experiments. 
 > 
-> _**DO NOT**_ expose the cluster or the NFS server to the outside world !!!
+> _**DO NOT**_ expose the cluster or the NFS server to the outside world (aka "the Internet") !!!
 >
 > USE AT YOUR OWN RISK
 
