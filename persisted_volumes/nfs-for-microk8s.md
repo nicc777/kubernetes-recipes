@@ -1,5 +1,12 @@
 # Creating an NFS Server via a container for use by a Kubernetes Cluster
 
+> [!WARNING]
+> The below steps including running a container image with the `--privileged` parameter which is a HIGH SECURITY RISK. It is intended to use short term for local testing of persisted volumes. It is highly recommended that you stop and delete the container after you conclude your own experiments. 
+> 
+> _**DO NOT**_ expose the cluster or the NFS server to the outside world !!!
+>
+> USE AT YOUR OWN RISK
+
 Steps to be performed on a system that must host the NFS server:
 
 ```shell
