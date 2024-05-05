@@ -23,3 +23,8 @@ Clients can mount with:
 mkdir -p $PWD/mnt/nfs
 sudo mount -v -o vers=4,loud NFS_SERVER_NAME_OR_IP_ADDRESS:/ $PWD/mnt/nfs
 ```
+
+# Prepare NFS Driver for microk8s
+
+Follow instructions on https://microk8s.io/docs/how-to-nfs
+
