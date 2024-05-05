@@ -1,3 +1,5 @@
+[main index](../README.md) | back to: [persisted volumes topic index](./README.md)
+
 # Creating an NFS Server via a container for use by a Kubernetes Cluster
 
 > [!WARNING]
@@ -35,3 +37,6 @@ sudo mount -v -o vers=4,loud NFS_SERVER_NAME_OR_IP_ADDRESS:/ $PWD/mnt/nfs
 
 Follow instructions on https://microk8s.io/docs/how-to-nfs
 
+<hr />
+
+[main index](../README.md) | back to: [persisted volumes topic index](./README.md)
