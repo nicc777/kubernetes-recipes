@@ -1,0 +1,41 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-example001
+  namespace: example001
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 5Mi
+  storageClassName: nfs-example001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-example001
+  namespace: example001
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: deployment-example001
+  template:
+    metadata:
+      name: deployment-example001
+      labels:
+        name: deployment-example001
+    spec:
+      containers:
+      - name: deployment-example001
+        image: docker.io/nginx:bookworm
+        volumeMounts:
+        - name: nfs
+          mountPath: "/usr/share/nginx/html"
+          readOnly: true
+      volumes:
+      - name: nfs
+        persistentVolumeClaim:
+          claimName: pvc-example001
