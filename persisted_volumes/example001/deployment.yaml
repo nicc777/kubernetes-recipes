@@ -5,12 +5,12 @@ metadata:
   name: pvc-example001
   namespace: example001
 spec:
+  storageClassName: nfs-example001
   accessModes:
-    - ReadOnlyMany
+  - ReadOnlyMany
   resources:
     requests:
       storage: 5Mi
-  storageClassName: nfs-example001
 ---
 apiVersion: apps/v1
 kind: Deployment
