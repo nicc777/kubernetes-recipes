@@ -8,7 +8,7 @@ provisioner: nfs.csi.k8s.io
 parameters:
   server: ${NFS_SERVER_HOST}
   share: /websites/examples/static_01
-  subDir: website-placeholder
+  subDir: website-placeholder # If this is not present, a random sub-directory will be created starting with "pvc-"
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 mountOptions:
