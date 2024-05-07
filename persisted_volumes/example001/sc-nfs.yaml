@@ -7,8 +7,9 @@ metadata:
 provisioner: nfs.csi.k8s.io
 parameters:
   server: ${NFS_SERVER_HOST}
-  share: /websites/examples/static_01/website-placeholder
-reclaimPolicy: Retain
+  share: /websites/examples/static_01
+  subDir: website-placeholder
+reclaimPolicy: Delete
 volumeBindingMode: Immediate
 mountOptions:
 - hard

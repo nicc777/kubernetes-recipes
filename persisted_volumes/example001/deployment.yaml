@@ -31,6 +31,9 @@ spec:
       containers:
       - name: deployment-example001
         image: docker.io/nginx:bookworm
+        ports:
+        - containerPort: 80
+          name: http-web-svc
         volumeMounts:
         - name: nfs
           mountPath: "/usr/share/nginx/html"
@@ -39,3 +42,35 @@ spec:
       - name: nfs
         persistentVolumeClaim:
           claimName: pvc-example001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-example001
+  namespace: example001
+spec:
+  selector:
+    app.kubernetes.io/name: deployment-example001
+  ports:
+  - name: website
+    protocol: TCP
+    port: 80
+    targetPort: http-web-svc
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: http-ingress
+  namespace: example001
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /example001
+        pathType: Prefix
+        backend:
+          service:
+            name: service-example001
+            port:
+              number: 80
