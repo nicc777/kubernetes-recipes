@@ -67,6 +67,7 @@ kubectl apply -f persisted_volumes/example001/deployment.yaml
 # References
 
 * https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
+* https://github.com/kubernetes-csi/csi-driver-nfs/blob/master/docs/driver-parameters.md
 
 <hr />
 
