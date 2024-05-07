@@ -37,6 +37,17 @@ sudo mount -v -o vers=4,loud NFS_SERVER_NAME_OR_IP_ADDRESS:/ $PWD/mnt/nfs
 
 Follow instructions on https://microk8s.io/docs/how-to-nfs
 
+For examples in this repo, the following commands were executed:
+
+```shell
+microk8s enable helm3
+microk8s helm3 repo add csi-driver-nfs https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
+microk8s helm3 repo update
+microk8s helm3 install csi-driver-nfs csi-driver-nfs/csi-driver-nfs \
+    --namespace kube-system \
+    --set kubeletDir=/var/snap/microk8s/common/var/lib/kubelet
+```
+
 <hr />
 
 [main index](../README.md) | back to: [persisted volumes topic index](./README.md)
