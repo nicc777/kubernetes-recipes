@@ -85,7 +85,6 @@ spec:
   selector:
     name: nginx-ingress-microk8s
   type: LoadBalancer
-  loadBalancerIP: ${LOAD_BALANCER_IP_ADDRESS}
   ports:
   - name: http
     protocol: TCP
