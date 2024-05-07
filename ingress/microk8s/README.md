@@ -1,4 +1,4 @@
-[main index](../README.md)
+[main index](../../README.md)
 
 # `microk8s` Ingress Setup
 
@@ -38,4 +38,4 @@ Note the value of the `EXTERNAL-IP`. Your actual value may differ depending on y
 
 <hr />
 
-[main index](../README.md)
+[main index](../../README.md)
