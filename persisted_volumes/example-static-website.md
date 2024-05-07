@@ -71,7 +71,7 @@ kubectl apply -f persisted_volumes/example001/deployment.yaml
     https://metallb.universe.tf/
 
   Consider then using: # envsubst < persisted_volumes/example001/deployment.yaml | kubectl apply -f -
--->>
+-->
 
 > [!IMPORTANT]
 > Still need to get the Ingress working...
