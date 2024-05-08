@@ -65,18 +65,6 @@ Finally, deploy the main web application:
 kubectl apply -f persisted_volumes/example001/deployment.yaml 
 ```
 
-<!--
-  TODO Enable MetalLB - see:
-    https://benbrougher.tech/posts/microk8s-ingress/
-    https://microk8s.io/docs/addon-metallb
-    https://metallb.universe.tf/
-
-  Consider then using: # envsubst < persisted_volumes/example001/deployment.yaml | kubectl apply -f -
--->
-
-> [!IMPORTANT]
-> Still need to get the Ingress working...
-
 # References
 
 * https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes

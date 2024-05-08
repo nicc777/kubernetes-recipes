@@ -21,12 +21,12 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      name: deployment-example001
+      name: app-example001
   template:
     metadata:
-      name: deployment-example001
+      name: app-example001
       labels:
-        name: deployment-example001
+        name: app-example001
     spec:
       containers:
       - name: deployment-example001
@@ -49,29 +49,29 @@ metadata:
   name: service-example001
   namespace: example001
 spec:
-  type: ClusterIP
   selector:
-    app.kubernetes.io/name: deployment-example001
+    name: app-example001
   ports:
-  - name: website
-    protocol: TCP
-    port: 80
-    targetPort: http-web-svc
+  - protocol: TCP
+    port: 8000
+    targetPort: 80
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: http-ingress
   namespace: example001
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
 spec:
   ingressClassName: nginx
   rules:
   - http:
       paths:
-      - path: /example001
+      - path: /example001(.*)
         pathType: Prefix
         backend:
           service:
             name: service-example001
             port:
-              number: 80
+              number: 8000

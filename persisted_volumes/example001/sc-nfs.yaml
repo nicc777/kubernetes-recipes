@@ -9,7 +9,7 @@ parameters:
   server: ${NFS_SERVER_HOST}          # Use this command to do environment variable substitution: envsubst < persisted_volumes/example001/sc-nfs.yaml | kubectl apply -f -
   share: /websites/examples/static_01
   subDir: website-placeholder         # If this is not present, a random sub-directory will be created starting with "pvc-"
-reclaimPolicy: Delete
+reclaimPolicy: Retain
 volumeBindingMode: Immediate
 mountOptions:
 - hard
