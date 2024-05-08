@@ -62,14 +62,15 @@ metadata:
   name: http-ingress
   namespace: example001
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx
   rules:
   - http:
       paths:
-      - path: /example001(.*)
-        pathType: Prefix
+      - path: /example001(/|$)(.*)
+        pathType: ImplementationSpecific
         backend:
           service:
             name: service-example001

@@ -48,6 +48,7 @@ rm -frR README.md LICENSE .git/ .gitignore
 Make sure you set the `NFS_SERVER_HOST` environment variable to point to your NFS server.
 
 ```shell
+# Add the IP address of your NFS server
 export NFS_SERVER_HOST=....
 ```
 
@@ -65,10 +66,33 @@ Finally, deploy the main web application:
 kubectl apply -f persisted_volumes/example001/deployment.yaml 
 ```
 
+## Testing
+
+First, determine what IP address your ingress is using:
+
+```shell
+# Just print the IP address to STDOUT
+kubectl get service ingress -n ingress -o yaml | yq ".status.loadBalancer.ingress[0].ip"
+
+# Set as an environment variable
+export INGRESS=`kubectl get service ingress -n ingress -o yaml | yq ".status.loadBalancer.ingress[0].ip"`
+```
+
+To test:
+
+```shell
+# Open the URL in a web browser
+xdg-open http://$INGRESS/example001/
+```
+
+> [!NOTE]
+> In the web browser, if you do not add the trailing slash, images and other artifacts may not load correctly.
+
 # References
 
 * https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
 * https://github.com/kubernetes-csi/csi-driver-nfs/blob/master/docs/driver-parameters.md
+* https://github.com/kubernetes/ingress-nginx/tree/main/docs/examples/rewrite
 
 <hr />
 
