@@ -6,7 +6,7 @@ This is an example of serving a static website from files on a NFS share.
 
 # Prerequisites
 
-* A NFS server (see [nfs-for-microk8s.md](./nfs-for-microk8s.md))
+* A NFS server (see [nfs-for-microk8s.md](./nfs/nfs-for-microk8s.md))
 * A LoadBalancer for use with the `Ingress`. For `microk8s` users, refer to [the `microk8s` README for Ingress](../ingress/microk8s/README.md)
 
 # Steps
