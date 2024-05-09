@@ -1,15 +1,22 @@
 {
     "cSpell.words": [
+        "asyncio",
         "daemonset",
+        "deepcopy",
         "distro",
         "envsubst",
+        "fastapi",
+        "getenv",
         "itsthenetwork",
         "ktrd",
+        "KUBECONFIG",
         "kubelet",
         "metallb",
         "nfsshare",
         "nohup",
         "reuseaddr",
-        "socat"
+        "socat",
+        "traceback",
+        "uvicorn"
     ]
 }

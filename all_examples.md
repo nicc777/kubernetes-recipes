@@ -2,9 +2,16 @@
 
 # List of all examples
 
-| Source Directory                             | Documentation                                                            | Topics                  | Dependencies                                                                                                                           |
-|----------------------------------------------|--------------------------------------------------------------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| [example001](./persisted_volumes/example001) | [example-static-website.md](persisted_volumes/example-static-website.md) | Persisted Volumes (NFS) | [nfs-for-microk8s.md](./persisted_volumes/nfs/nfs-for-microk8s.md) & [the `microk8s` README for Ingress](./ingress/microk8s/README.md) |
+General Prerequisites or dependencies relevant for all examples
+
+* [the `microk8s` README for Ingress](./ingress/microk8s/README.md)
+
+List of examples:
+
+| Source Directory                                                                | Documentation                                                                                   | Topics                  | Dependencies                                                          |
+|---------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|-------------------------|-----------------------------------------------------------------------|
+| [example001](./persisted_volumes/example001)                                    | [example-static-website.md](persisted_volumes/example-static-website.md)                        | Persisted Volumes (NFS) | [nfs-for-microk8s.md](./persisted_volumes/nfs/nfs-for-microk8s.md)    |
+| [example002](./other_topics_and_examples/python_script_as_config_map)           | [Python Script as ConfigMap](./other_topics_and_examples/python_script_as_config_map/README.md) | ConfigMap               |                                                                       |
 
 <hr />
 
