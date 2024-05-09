@@ -1,7 +1,15 @@
 {
     "cSpell.words": [
+        "daemonset",
         "distro",
         "envsubst",
-        "metallb"
+        "itsthenetwork",
+        "ktrd",
+        "kubelet",
+        "metallb",
+        "nfsshare",
+        "nohup",
+        "reuseaddr",
+        "socat"
     ]
 }
