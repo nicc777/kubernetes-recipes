@@ -7,6 +7,23 @@ Some recipes, how-to and step-by-step instruction on various things around Kuber
 >
 > USE AT YOUR OWN RISK
 
+# Recommendations for Local Testing
+
+Some tests involve running of some Python scripts or apps on your local machine.
+
+It is highly recommended to run the scripts from a virtual environment. To create a virtual environment:
+
+```shell
+# Create
+python3 -m venv venv
+
+# Activate 
+. venv/bin/activate
+
+# Install requirements
+pip3 install -r requirements.txt
+``` 
+
 # Content Links
 
 | Topics                | Link                                                              | Notes                                                                                        |
