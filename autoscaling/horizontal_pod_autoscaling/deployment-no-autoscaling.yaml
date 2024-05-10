@@ -1,0 +1,130 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: example003
+  labels:
+    name: example003
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fastapi-code-dm
+  namespace: example003
+data:
+  app: |
+    import sys
+    import os
+    import traceback
+    import uvicorn
+    import random
+    from datetime import datetime
+    import re
+    from fastapi import FastAPI
+
+    app = FastAPI()
+
+    @app.get("/")
+    async def root():
+        return {"message": "ok"}
+
+    def isprime(n):
+      return re.compile(r'^1?$|^(11+)\1+$').match('1' * n) is None
+
+    @app.get('/test')
+    async def test():
+      result = dict()
+      result['primes'] = list()
+      wait_time = random.uniform(1.0, 3.0)
+      now = datetime.now().timestamp()
+      seen = list()
+      while (datetime.now().timestamp() - now) < wait_time:
+        seen = [x for x in range(1000) if isprime(x)]
+      result['primes'] = seen
+      return result
+
+    if __name__ == '__main__':
+      uvicorn.run(app, host="0.0.0.0", port=8080, workers=1)
+      print("DONE")
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-test
+  namespace: example003
+  labels:
+    app: fastapi-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: fastapi-test
+  template:
+    metadata:
+      labels:
+        name: fastapi-test
+    spec:
+      containers:
+      - name: fastapi-test
+        image: ghcr.io/nicc777/container-python4aws:v3.12.1-1
+        volumeMounts:
+        - name: fastapi-code-vol
+          mountPath: "/tmp"
+          readOnly: true
+        ports:
+        - containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        command: ["/bin/sh"]
+        args: ["-c", "python3 /tmp/app.py"]
+      volumes:
+      - name: fastapi-code-vol
+        configMap:
+          name: fastapi-code-dm
+          items:
+          - key: app
+            path: app.py
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-test-service
+  namespace: example003
+spec:
+  selector:
+    name: fastapi-test
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: http-ingress
+  namespace: example003
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /example003(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: fastapi-test-service
+            port:
+              number: 8080
