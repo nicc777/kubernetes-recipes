@@ -58,7 +58,7 @@ fastapi-test-85ff8d5cf5-262k7   1/1     Running   7 (75s ago)   33m
 
 ## Add a CPU based autoscaler
 
-TODO
+TODO - Complete section
 
 # References
 
