@@ -67,6 +67,13 @@ spec:
       containers:
       - name: fastapi-test
         image: ghcr.io/nicc777/container-python4aws:v3.12.1-1
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
         volumeMounts:
         - name: fastapi-code-vol
           mountPath: "/tmp"
