@@ -7,6 +7,28 @@
 TODO - Add metrics monitoring...
 -->
 
+# Preparation - Monitor Current Performance
+
+You will need two separate terminal windows for monitoring. Something like [tmux](https://github.com/tmux/tmux/wiki) could help with this by [splitting the window](https://tmuxcheatsheet.com/).
+
+> [!TIP]
+> For the experiment, I find it best to have a 3-window spit. First split horisontally with `CTRL+B "`. Then move to the top window and split again vertically with `CTRL+B %`. I use the top two windows for monitoring or watching stuff and the bottom window for entering commands.
+
+In one window, run the following command to get a live view of the nginx ingress:
+
+```shell
+kubectl logs -f $(kubectl get pod -n ingress --output jsonpath='{.items[0].metadata.name}') -n ingress | ngxtop
+```
+
+> [!TIP]
+> Wait a couple of minutes for the monitor to settle down. Alternatively delete the ingress Pod to force a fresh new one with empty logs before running the command above.
+
+In the other window, run the following command to monitor the Pod performance: 
+
+```shell
+watch kubectl top pod -l name=fastapi-test -n example003
+```
+
 # Basic Benchmark
 
 Apply example 3 and start the load test:
