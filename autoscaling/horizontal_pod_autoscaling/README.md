@@ -17,6 +17,10 @@ You will need two separate terminal windows for monitoring. Something like [tmux
 In one window, run the following command to get a live view of the nginx ingress:
 
 ```shell
+# Delete the old Ingress pod in order to get fresh logs
+kubectl delete pod $(kubectl get pod -n ingress --output jsonpath='{.items[0].metadata.name}') -n ingress
+
+# Monitor the logs
 kubectl logs -f $(kubectl get pod -n ingress --output jsonpath='{.items[0].metadata.name}') -n ingress | ngxtop
 ```
 
