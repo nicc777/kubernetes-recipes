@@ -48,11 +48,19 @@ Apply example 3 and start the load test:
 # Deploy the example with no autoscaling
 kubectl apply -f autoscaling/horizontal_pod_autoscaling/deployment-no-autoscaling.yaml
 
+# NOTE: Wait about 2 or 3 minutes for the deployment to completely stabilize
+sleep 120
+
 # Get the ingress IP
 export INGRESS=`kubectl get service ingress -n ingress -o yaml | yq ".status.loadBalancer.ingress[0].ip"`
 
-# Start the load test
-locust -f autoscaling/horizontal_pod_autoscaling/loadtest.py -H http://$INGRESS
+# Start the load test - The example below starts with 8 users and will run for 5 minutes
+locust -f autoscaling/horizontal_pod_autoscaling/loadtest.py \
+--host http://$INGRESS \
+--users 8 \
+--spawn-rate 1 \
+--autostart \
+--run-time 300
 ```
 
 In a separate terminal you can open your web browser:
@@ -62,7 +70,7 @@ In a separate terminal you can open your web browser:
 xdg-open http://127.0.0.1:8089
 ```
 
-In many cases using just 1 user should be enough to force a failure. You can increase the user count if this does not happen.
+In some cases using just 1 user should be enough to force a failure, depending on what your host system capabilities are. You can increase the user count if this does not happen. To "shock" the system, start immediately with 8 users.
 
 How will you know there are failures:
 
