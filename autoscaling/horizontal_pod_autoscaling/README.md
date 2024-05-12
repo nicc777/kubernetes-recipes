@@ -92,10 +92,18 @@ $ curl http://$INGRESS/example003
 </body>
 </html>
 
+# Observe the pod status (post test, everything stabilized again)
 $ kubectl get pods -n example003
-NAME                            READY   STATUS    RESTARTS      AGE
-fastapi-test-85ff8d5cf5-262k7   1/1     Running   7 (75s ago)   33m
+NAME                            READY   STATUS    RESTARTS       AGE
+fastapi-test-78979f4b8c-bcgct   1/1     Running   6 (119m ago)   124m
+fastapi-test-78979f4b8c-cnjvk   1/1     Running   6 (118m ago)   124m
+fastapi-test-78979f4b8c-jmw2f   1/1     Running   7 (117m ago)   124m
+fastapi-test-78979f4b8c-v8jqb   1/1     Running   6 (118m ago)   124m
 ```
+
+At the end of the benchmark, you may have a picture similar to the following on your locust web UI:
+
+![no scaling graphs](./img_no_scaling.png)
 
 ## Add a CPU based autoscaler
 
