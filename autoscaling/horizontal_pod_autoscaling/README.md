@@ -29,6 +29,13 @@ In the other window, run the following command to monitor the Pod performance:
 watch kubectl top pod -l name=fastapi-test -n example003
 ```
 
+> [!NOTE]
+> Alternatives to monitor cluster and application performance include:
+> 
+> * Kubernetes Dashboard, included with [microk8s](https://microk8s.io/docs/addon-dashboard) or [installed separately](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
+> * Another command line tool, [k9s](https://k9scli.io/)
+> * Dedicated monitoring application, for example [kube-prometheus](https://github.com/prometheus-operator/kube-prometheus), which uses Grafana, Prometheus and friends 
+
 # Basic Benchmark
 
 Apply example 3 and start the load test:
