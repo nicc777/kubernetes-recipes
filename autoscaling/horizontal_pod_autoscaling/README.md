@@ -1,12 +1,5 @@
 [main index](../../README.md) | back to: [autoscaling topic index](../README.md)
 
-> [!WARNING]
-> Work in Progress... This section is still in development and may see various changes from the current state of the content
-
-<!--
-TODO - Add metrics monitoring...
--->
-
 # Preparation - Monitor Current Performance
 
 You will need two separate terminal windows for monitoring. Something like [tmux](https://github.com/tmux/tmux/wiki) could help with this by [splitting the window](https://tmuxcheatsheet.com/).
@@ -158,6 +151,14 @@ fastapi-test-7db9f7bb5c-zr7vs   0/1     Terminating   4 (6m44s ago)   9m46s
 ```
 
 Eventually, only the minimum of two Pods will be left running.
+
+# Conclusion
+
+Getting the exact right configuration takes time and not all issues can always be resolved by just Kubernetes settings as applications may have inherent bugs that must also be addressed to ensure smooth operations.
+
+However, assuming that your applications run with acceptable performance metrics, the Kubernetes Pod Horizontal Autoscaler provides a powerful tool to ensure smooth running applications performance under variable load.
+
+The horizontal autoscaler should also be used in conjunction with a Node autoscaling solution, for example [karpenter](https://karpenter.sh/). By combining these tools you can enure not only effectively managing variable loads, but also ensure optimal costs by getting rid of resources like Nodes that actually cost money.
 
 # References
 
