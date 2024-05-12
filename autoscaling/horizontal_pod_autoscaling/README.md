@@ -105,9 +105,28 @@ At the end of the benchmark, you may have a picture similar to the following on 
 
 ![no scaling graphs](./img_no_scaling.png)
 
-## Add a CPU based autoscaler
+As can be seen, near the end the Pods just could no longer keep up.
 
-TODO - Complete section
+# Add a CPU based Pod Horizontal Autoscaler
+
+Assuming the deployment from the previous test is still deployed, we can easily delete it and deploy our deployment with a CPU based horizontal Pod autoscaling configuration based only on CPU metrics.
+
+```shell
+# Delete previous deployment
+kubectl delete -f autoscaling/horizontal_pod_autoscaling/deployment-no-autoscaling.yaml
+
+# New deployment, with CPU based horizontal auto scaling
+kubectl apply -f autoscaling/horizontal_pod_autoscaling/deployment-cpu-based-autoscaling.yaml
+
+# again, give about 2 minutes for everything to stabilize
+sleep 120
+```
+
+You can now start the same experiment again, starting with the deletion of the Ingress pod in order to reset the logs.
+
+Kubernetes takes some time to actually start the scaling up of Pods, and since we only start with 2 pods, you may see a high initial failure rate. However, after scaling we see a lot more stable performance eight to the end of the test, as can be seen from the graphs below:
+
+![cpu scaling graphs](./img_cpu_scaling.png)
 
 # References
 
