@@ -128,6 +128,37 @@ Kubernetes takes some time to actually start the scaling up of Pods, and since w
 
 ![cpu scaling graphs](./img_cpu_scaling.png)
 
+Our list of pods shortly after the test:
+
+```shell
+$ kubectl get pods -n example003
+NAME                            READY   STATUS    RESTARTS        AGE
+fastapi-test-7db9f7bb5c-5qrl8   1/1     Running   6 (3m26s ago)   11m
+fastapi-test-7db9f7bb5c-72zt7   1/1     Running   4 (3m11s ago)   6m25s
+fastapi-test-7db9f7bb5c-db6q9   1/1     Running   4 (3m29s ago)   6m25s
+fastapi-test-7db9f7bb5c-hhhfv   1/1     Running   5 (3m31s ago)   6m55s
+fastapi-test-7db9f7bb5c-j4fb2   1/1     Running   6 (4m10s ago)   12m
+fastapi-test-7db9f7bb5c-kxf76   1/1     Running   3 (3m48s ago)   6m40s
+fastapi-test-7db9f7bb5c-tdlqk   1/1     Running   5 (3m10s ago)   6m55s
+fastapi-test-7db9f7bb5c-xvqd9   1/1     Running   3 (3m44s ago)   6m40s
+fastapi-test-7db9f7bb5c-zjg8x   1/1     Running   4 (3m21s ago)   6m40s
+fastapi-test-7db9f7bb5c-zr7vs   1/1     Running   4 (3m38s ago)   6m40s
+```
+
+After Pods have been idle for about 5 minutes, the autoscaler will start to terminate pods:
+
+```shell
+$ kubectl get pods -n example003
+NAME                            READY   STATUS        RESTARTS        AGE
+fastapi-test-7db9f7bb5c-hhhfv   1/1     Terminating   5 (6m37s ago)   10m
+fastapi-test-7db9f7bb5c-j4fb2   1/1     Running       6 (7m16s ago)   15m
+fastapi-test-7db9f7bb5c-xvqd9   1/1     Running       3 (6m50s ago)   9m46s
+fastapi-test-7db9f7bb5c-zjg8x   0/1     Terminating   4 (6m27s ago)   9m46s
+fastapi-test-7db9f7bb5c-zr7vs   0/1     Terminating   4 (6m44s ago)   9m46s
+```
+
+Eventually, only the minimum of two Pods will be left running.
+
 # References
 
 * [Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
