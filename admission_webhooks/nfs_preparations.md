@@ -65,6 +65,10 @@ export NFS_SERVER_HOST=....
 envsubst < admission_webhooks/common_deployments/deployments.yaml | kubectl apply -f -
 ```
 
+# Next
+
+Proceed to [the initial test deployment](./initial_test_deployment.md) in order to test the example application deployment without any admission webhooks.
+
 <hr />
 
 [main index](../README.md)

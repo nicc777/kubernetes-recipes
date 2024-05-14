@@ -6,29 +6,13 @@ metadata:
   labels:
     name: example004
 ---
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: nfs-example004
-  namespace: example004
-provisioner: nfs.csi.k8s.io
-parameters:
-  server: ${NFS_SERVER_HOST}          # Use this command to do environment variable substitution: envsubst < persisted_volumes/example004/sc-nfs.yaml | kubectl apply -f -
-  share: /websites/examples/static_01
-  subDir: website-placeholder         # If this is not present, a random sub-directory will be created starting with "pvc-"
-reclaimPolicy: Retain
-volumeBindingMode: Immediate
-mountOptions:
-- hard
-- nfsvers=4.1
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: pvc-example004
   namespace: example004
 spec:
-  storageClassName: nfs-example004
+  storageClassName: nfs-example001  # NOTE: This re-uses the example001 NFS StorageClass
   accessModes:
   - ReadOnlyMany
   resources:
@@ -41,7 +25,7 @@ metadata:
   name: deployment-example004
   namespace: example004
 spec:
-  replicas: 1
+  replicas: 2 # CHange this value to a number higher than 4 to test the mutating webhook - the end result will be a max. of 4 replicas
   selector:
     matchLabels:
       name: app-example004
@@ -54,6 +38,13 @@ spec:
       containers:
       - name: deployment-example004
         image: docker.io/nginx:bookworm
+        # resources:            # You will need to uncomment this section in order to pass the validating webhook.
+        #   requests:
+        #     memory: "64Mi"
+        #     cpu: "250m"
+        #   limits:
+        #     memory: "128Mi"
+        #     cpu: "500m"
         ports:
         - containerPort: 80
           name: http-web-svc
