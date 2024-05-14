@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "asyncio",
+        "Autoscaler",
         "daemonset",
         "deepcopy",
         "distro",
@@ -8,10 +9,12 @@
         "fastapi",
         "getenv",
         "itsthenetwork",
+        "Kristijan",
         "ktrd",
         "KUBECONFIG",
         "kubelet",
         "metallb",
+        "Mitevski",
         "nfsshare",
         "nohup",
         "reuseaddr",
