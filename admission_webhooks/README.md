@@ -4,8 +4,8 @@
 
 | Topic(s) / Tag(s)                                                                   | Documentation Link                                                              |  Notes                                                                                                                            |
 |-------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| <ul><li>example</li><li>deployment</li><li>ValidatingWebhookConfiguration</li></ul> | [ValidatingWebhookConfiguration](./validating_webhook_configuration/README.md)  | An example of a validating webhook that will ensure every deployment have resource limits set.                                    |
-| <ul><li>example</li><li>deployment</li><li>MutatingWebhookConfiguration</li></ul>   | [MutatingWebhookConfiguration](./mutating_webhook_configuration/README.md)      | An example of a mutating webhook that will ensure that the maximum replica count of a deployment does not exceed a certain value. |
+| <ul><li>example</li><li>deployment</li><li>ValidatingWebhookConfiguration</li></ul> | [ValidatingWebhookConfiguration](./validating_webhook_deployments/README.md)  | An example of a validating webhook that will ensure every deployment have resource limits set.                                      |
+| <ul><li>example</li><li>deployment</li><li>MutatingWebhookConfiguration</li></ul>   | [MutatingWebhookConfiguration](./mutating_webhook_deployments/README.md)      | An example of a mutating webhook that will ensure that the maximum replica count of a deployment does not exceed a certain value.   |
 
 > [!NOTE]
 > For this content, I drew a lot of inspiration from the wonderful blog posts from Kristijan Mitevski:

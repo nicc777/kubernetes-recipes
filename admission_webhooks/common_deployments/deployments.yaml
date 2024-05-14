@@ -1,0 +1,16 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-admission-scripts
+  namespace: default
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: ${NFS_SERVER_HOST}          # Use this command to do environment variable substitution: envsubst < persisted_volumes/example004/sc-nfs.yaml | kubectl apply -f -
+  share: /admission-scripts
+  subDir: website-placeholder         # If this is not present, a random sub-directory will be created starting with "pvc-"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+mountOptions:
+- hard
+- nfsvers=4.1
