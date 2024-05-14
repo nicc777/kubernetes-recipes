@@ -6,6 +6,9 @@ General Prerequisites or dependencies relevant for all examples
 
 * [the `microk8s` README for Ingress](./ingress/microk8s/README.md)
 
+> [!IMPORTANT]
+> If you do not use `microk8s`, you must adjust the examples to fit your NFS related environment.
+
 List of examples:
 
 | Source Directory                                                                | Documentation                                                                                   | Topics                  | Dependencies                                                          |
