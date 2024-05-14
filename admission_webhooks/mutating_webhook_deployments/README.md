@@ -13,7 +13,7 @@ TODO
 
 If not already done previously:
 
-* [ValidatingWebhookConfiguration](./validating_webhook_deployments/README.md)
+* [ValidatingWebhookConfiguration](../validating_webhook_deployments/README.md)
 
 <hr />
 
