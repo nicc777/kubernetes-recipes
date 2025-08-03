@@ -205,7 +205,7 @@ kuard           ClusterIP   10.43.76.19    <none>        80/TCP         19m
 In the example output above, the port is 32223. You can then run the following:
 
 ```bash
-open http://test1.toetzen.nl:32223/
+open http://test1.${DOMAIN}:32223/
 ```
 
 The web page should open in a web browser.
