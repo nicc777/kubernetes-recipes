@@ -18,6 +18,9 @@ Basic features covered in this recipe:
 
 ![design](./design.png)
 
+> [!IMPORTANT]
+> This example does not make use of a Load Balancer. Instead, a `NodePort` is used and therefore every gateway will listen on it's own port.
+
 ## Preparations
 
 ### AWS Preparations
