@@ -20,6 +20,7 @@ This recipe was developed and tested early August 2025.
 - [Create a Certificate and add a Gateway](#create-a-certificate-and-add-a-gateway)
   * [Provisioning](#provisioning)
   * [Testing](#testing)
+- [References](#references)
 
 <!-- tocstop -->
 
@@ -296,3 +297,10 @@ curl -vvv http://${APP_DOMAIN}:${HTTP_PORT}/
 # (ignore the certificate check because we are using a staging certificate)
 curl -vvv -k https://${APP_DOMAIN}:${HTTPS_PORT}/
 ```
+
+## References
+
+* [`k3s` Documentation](https://docs.k3s.io/)
+* [Nginx Gateway Fabric Documentation](https://docs.nginx.com/nginx-gateway-fabric/)
+* [`cert-manager` Documentation](https://cert-manager.io/docs/)
+* [Gateway API Specification Documentation](https://gateway-api.sigs.k8s.io/)
