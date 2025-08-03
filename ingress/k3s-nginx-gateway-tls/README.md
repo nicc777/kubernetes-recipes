@@ -7,6 +7,24 @@ This recipe was developed and tested early August 2025.
 >
 > The recipe assumes DNS is maintained in AWS Route 53 - adjust the DNS related configuration (including registrar credentials) to suite your needs.
 
+<!-- toc -->
+
+  * [Introduction](#introduction)
+- [Preparations](#preparations)
+  * [AWS Preparations](#aws-preparations)
+  * [Local System Preparations](#local-system-preparations)
+- [Uninstall Previous Version](#uninstall-previous-version)
+- [Install a Fresh Cluster](#install-a-fresh-cluster)
+- [Install the Nginx Gateway Fabric](#install-the-nginx-gateway-fabric)
+- [Installing `cert-manager`](#installing-cert-manager)
+- [Create a Certificate and add a Gateway](#create-a-certificate-and-add-a-gateway)
+  * [Provisioning](#provisioning)
+  * [Testing](#testing)
+
+<!-- tocstop -->
+
+### Introduction
+
 Basic features covered in this recipe:
 
 * Uninstall a previous deployment
