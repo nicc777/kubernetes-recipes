@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: example-tld-route53-creds-secret
+  #     ^^^^^^^^^^^
+  # Change the name to your preference. I prefer using the domain to keep
+  # things organized.
+type: Opaque
+stringData:
+  access-key-id: OBTAIN-FROM-AWS 
+  secret-access-key: OBTAIN-FROM-AWS
+  # Update the credentials above...
