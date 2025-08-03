@@ -1,0 +1,32 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-example-tld
+  #                 ^^^^^^^^^^^
+  # Change the name to your preference. I prefer using the domain to keep
+  # things organized.
+spec:
+  acme:
+    email: the-admin@example.tld
+    #      ^^^^^^^^^^^^^^^^^^^^^
+    # Use your actual email address
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    # server: https://acme-v02.api.letsencrypt.org/directory # <-- Use this for PROD
+    privateKeySecretRef:
+      name: example-tld-issuer-account-key
+      #    ^^^^^^^^^^^
+      # Update above
+    solvers:
+    - dns01:
+        route53:
+          region: eu-central-1
+          accessKeyIDSecretRef:
+            name: example-tld-route53-creds-secret
+            #     ***********
+            # Update as required
+            key: access-key-id
+          secretAccessKeySecretRef:
+            name: example-tld-route53-creds-secret
+            #     ***********
+            # Update as required
+            key: secret-access-key

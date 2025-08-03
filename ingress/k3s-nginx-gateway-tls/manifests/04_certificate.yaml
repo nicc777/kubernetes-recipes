@@ -1,0 +1,20 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: test1-example-tld-certificate
+  #     ^^^^^^^^^^^^^^^^^
+  # Update as required
+spec:
+  secretName: test1-example-tld-tls-secret
+  #           ^^^^^^^^^^^^^^^^^
+  # Update as required
+  issuerRef:
+    name: letsencrypt-example-tld
+    #                 ^^^^^^^^^^^
+    # Update as required
+    kind: ClusterIssuer
+    group: cert-manager.io
+  dnsNames:
+    - "example.tld"
+    - "test1.example.tld"
+  # Update the above domains to your own.
