@@ -211,7 +211,7 @@ open http://test1.${DOMAIN}:32223/
 The web page should open in a web browser.
 
 > [!IMPORTANT]
-> If the web page is not oening, you will need to troubleshoot this problem first before you can continue.
+> If the web page is not opening, you will need to troubleshoot this problem first before you can continue.
 
 Post Test Cleanup:
 
