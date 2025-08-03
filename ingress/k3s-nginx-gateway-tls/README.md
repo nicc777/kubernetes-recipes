@@ -20,6 +20,8 @@ Basic features covered in this recipe:
 
 > [!IMPORTANT]
 > This example does not make use of a Load Balancer. Instead, a `NodePort` is used and therefore every gateway will listen on it's own port.
+>
+> Furthermore, the example does not cover the use case of certificate rotation, since this is a development use case with an short lifespan (couple of days, perhaps).
 
 ## Preparations
 
@@ -59,6 +61,9 @@ cp -vf ingress/k3s-nginx-gateway-tls/manifests/* /tmp/
 ```
 
 Edit the files in `/tmp` to update the fields as indicated in the files.
+
+> [!NOTE]
+> From this point, it is assumed that the files in `/tmp` are all properly edited with the correct values.
 
 ## Uninstall Previous Version
 
@@ -167,7 +172,7 @@ EOF
 kubectl apply -f /tmp/routes.yaml -n kuard
 ```
 
-In AWS Route 53, create a record `test1` that points to `192.168.2.13` (IP address of `sharky`).
+In AWS Route 53, create a record `test1` that points to `192.168.2.13` (IP address of your server on your LAN).
 
 Test connectivity by first getting the `NodePort`:
 
@@ -195,4 +200,81 @@ Post Test Cleanup:
 kubectl delete -f /tmp/routes.yaml -n kuard
 
 kubectl delete -f /tmp/gateway.yaml -n kuard
+```
+
+## Installing `cert-manager`
+
+Installing `cert-manager` with `Helm` is well [documented](https://cert-manager.io/docs/installation/helm/), and it comes down to the following command:
+
+```bash
+helm install \
+  cert-manager oci://quay.io/jetstack/charts/cert-manager \
+  --version v1.18.2 \
+  --namespace cert-manager \
+  --create-namespace \
+  --set crds.enabled=true
+```
+
+Once the installation is complete, prepare a `ClusterIssuer` for your domain ([general documentation](https://cert-manager.io/docs/configuration/acme/dns01/) and [Route 53 specific documentation](https://cert-manager.io/docs/configuration/acme/dns01/route53/)):
+
+```bash
+# Create a secret with the AWS IAM credentials required for updating Route 53
+# (lets-encrypt feature for verifying you own the domain)
+kubectl apply -f /tmp/01_aws_route53_creds.yaml -n cert-manager
+
+# Deploy the Cluster Issuer 
+kubectl apply -f /tmp/02_cluster_issuer.yaml -n cert-manager
+
+# Deploy policy to allow other namespaces access to the required Secrets
+kubectl apply -f /tmp/03_cert_read_grant.yaml -n cert-manager
+```
+
+## Create a Certificate and add a Gateway
+
+The original application is still deployed, but now we will simply expose the service via TLS (and also still HTTP, for testing purposes).
+
+> [!NOTE]
+> Because we issued the certificate from `https://acme-staging-v02.api.letsencrypt.org/directory`, the browser will not trust the certificate.
+
+### Provisioning
+
+The `Gateway` can now be provisioned:
+
+```bash
+# Create a certificate
+# More info at https://cert-manager.io/docs/usage/certificate/
+kubectl apply -f /tmp/04_certificate.yaml -n kuard
+
+# This may take a couple of minutes
+
+# Once the certificate is ready, deploy the Gateway:
+kubectl apply -f /tmp/05_gateway.yaml -n kuard
+
+# And finally, add routes to the Gateway to link up with hte application
+kubectl apply -f /tmp/06_routes.yaml -n kuard
+```
+
+### Testing
+
+Once again, the correct `NodePort` for both HTTP and HTTPS needs to be obtained:
+
+```bash
+kubectl get services -n kuard
+# Expected Output (example only)
+# -----------------------------------------------------------------------------
+# NAME            TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE
+# gateway-nginx   NodePort    10.43.196.63   <none>        80:30103/TCP,443:32735/TCP   26h
+# kuard           ClusterIP   10.43.76.19    <none>        80/TCP                       32h
+
+# set your application domain:
+export APP_DOMAIN="test1.${DOMAIN}"
+export HTTP_PORT=$(kubectl get services -n kuard gateway-nginx -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
+export HTTPS_PORT=$(kubectl get services -n kuard gateway-nginx -o jsonpath='{.spec.ports[?(@.port==443)].nodePort}')
+
+# Test te HTTP port
+curl -vvv http://${APP_DOMAIN}:${HTTP_PORT}/
+
+# Test te HTTPS port
+# (ignore the certificate check because we are using a staging certificate)
+curl -vvv -k https://${APP_DOMAIN}:${HTTPS_PORT}/
 ```
