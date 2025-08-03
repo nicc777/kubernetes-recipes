@@ -53,13 +53,7 @@ helm list --all-namespaces
 Also remove any prior manifests and copy the current template manifests:
 
 ```bash
-rm -vf /tmp/05_gateway.yaml    \
-/tmp/01_aws_route53_creds.yaml \
-/tmp/02_cluster_issuer.yaml    \
-/tmp/03_cert_read_grant.yaml   \
-/tmp/04_certificate.yaml       \
-/tmp/05_gateway.yaml           \
-/tmp/06_routes.yaml
+rm -vf /tmp/*.yaml
 
 cp -vf ingress/k3s-nginx-gateway-tls/manifests/* /tmp/
 ```
