@@ -1,3 +1,5 @@
+[main index](../../README.md) | [ingress index](../README.md)
+
 # K3s with Nginx Gateway Fabric with TLS termination via Lets-Encrypt
 
 This recipe was developed and tested early August 2025.
@@ -304,3 +306,7 @@ curl -vvv -k https://${APP_DOMAIN}:${HTTPS_PORT}/
 * [Nginx Gateway Fabric Documentation](https://docs.nginx.com/nginx-gateway-fabric/)
 * [`cert-manager` Documentation](https://cert-manager.io/docs/)
 * [Gateway API Specification Documentation](https://gateway-api.sigs.k8s.io/)
+
+<hr />
+
+[main index](../../README.md) | [ingress index](../README.md)
