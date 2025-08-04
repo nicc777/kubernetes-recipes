@@ -17,7 +17,7 @@ The original recipe was a good introduction, but I include this one as it feels 
 
 The updated design is shown below, and the updated commands below that.
 
-TODO - Add updated design
+![design](./design.png)
 
 ## Preparation
 
