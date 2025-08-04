@@ -1,0 +1,16 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-kuard-gateway-to-tls-secret
+  namespace: cert-manager
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      namespace: kuard
+  to:
+    - group: ""
+      kind: Secret
+      name: example-tld-issuer-account-key
+      #    ^^^^^^^^^^^^
+      # Update as required
