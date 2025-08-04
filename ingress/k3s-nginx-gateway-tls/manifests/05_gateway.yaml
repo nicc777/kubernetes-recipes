@@ -2,20 +2,6 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: gateway
-spec:
-  gatewayClassName: nginx
-  listeners:
-  - name: http
-    port: 80
-    protocol: HTTP
-    hostname: "*.example.tld"
-    #            ^^^^^^^^^^^
-    # UPDATE the domain above
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: gateway
   annotations: # 
     cert-manager.io/cluster-issuer: letsencrypt-example-tld
     #                                           ^^^^^^^^^^^
