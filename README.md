@@ -31,6 +31,7 @@ pip3 install -r requirements.txt
 | Index of all examples | [index of examples](./all_examples.md) |  |
 | Ingress               | [Ingress and API Gateway Topics](/ingress/README.md) |  |
 | Storage               | [Persisted Volume Topic Index](./persisted_volumes/README.md) | Index page for further content regarding local storage, persisted volumes and related topics |
+| Dynamic Admission Control | [Admission Control Starting Point](./admission_webhooks/README.md) | Go through admission control using a Python based webhook implementation. |
 
 > [!NOTE]
 > All content hosted in this repo are my field notes and I may include many additional links to external sources which I consulted at the time of producing content. If you spot errors, please feel free to open an issue of create a pull request.
