@@ -1,5 +1,5 @@
 
-[main index](,,/../README.md) | [bootstrap menu](../README.md)
+[main index](../../README.md) | [bootstrap menu](../README.md)
 
 <hr />
 
