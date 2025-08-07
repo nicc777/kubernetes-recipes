@@ -59,7 +59,9 @@ The examples make extensive use of the following tools and it is assumed you hav
 | `bash` | OS Package is sufficient |
 | `curl` | OS Package is sufficient |
 | `git` command line client | OS Package is sufficient |
+| `sed` command line client | OS Package is sufficient |
 | `podman` | OS Package is sufficient. You can use Docker if you really want to, but the world has moved on... |
+| `helm` | Follow the instructions from the [Helm Documentation](https://helm.sh/docs/intro/install/) |
 | `kubectl` | Install a version closely versioned to your Kubernetes version (plus-or-minus 1 version should be ok). [Linux Installation Instructions](https://v1-32.docs.kubernetes.io/docs/tasks/tools/install-kubectl-linux/) |
 | Text Editor like `neovim` | Something you are familiar with that you can use to edit files in the terminal with. I prefer [`Lazyvim`](https://www.lazyvim.org/), but it does not really matter what you use. |
 
@@ -76,6 +78,114 @@ The examples make extensive use of the following tools and it is assumed you hav
 The Cluster will be installed on a host as a single-node cluster. Thereafter, `Tekton` will be installed, from where the remainder of the installation and configuration will be run through pipelines.
 
 The idea is to adopt DevOps / DevSecOps best practices as early as possible.
+
+## Preparation
+
+Create an environment file that you can use to set all the variable values used in this recipe:
+
+```bash
+cat <<EOF > $HOME/.k3s_local_dev_env
+# Add you private server LAN IP address here:
+export SERVER=...
+
+# Add your AWS credentials here for lets-encrypt to update your Route 53 ZONE:
+export LE_R53_KEY=...
+export LE_R53_SECRET=...
+
+# Add your domain information below:
+export ROUTE_53_ZONEID=...
+export ROUTE_53_DOMAIN=...
+
+# Your Kubernetes configuration for using kubectl and other tools:
+export KUBECONFIG=$HOME/k3s.yaml
+EOF
+
+chmod 600 $HOME/.k3s_local_dev_env
+
+# Load the file:
+. $HOME/.k3s_local_dev_env
+```
+
+> [!IMPORTANT]
+> This file contains sensitive information, and should be protected against unauthorized access. DO NOT make this file public in any way !!!
+
+On the server you also need to ensure your user can run certain commands with `sudo` and not require a password. Add the following to your `sudoers` file:
+
+```text
+your-user-name ALL = NOPASSWD: /usr/local/bin/k3s-uninstall.sh
+your-user-name ALL = NOPASSWD: /tmp/k3s_install.sh
+```
+
+## Installing K3s From Scratch
+
+I like to run a clean version in my local environment for experiments. This approach holds certain advantages, including:
+
+* Forces automation via pipelines
+* Ensures all steps can be easily reproduced via pipelines
+* Keeping pace with new versions of key software elements and enables early identification of breaking changes that can be quickly fixed in pipelines, ensuring you always have the latest working configuration for a local development and testing environment.
+* Experiments are easily reproducible
+
+### Uninstall Any Previous K3s Installation
+
+Only required if you have a current `k3s` cluster.
+
+Also refer to the [k3s documentation](https://docs.k3s.io/installation/uninstall) for the most up to date information.
+
+Command:
+
+```bash
+ssh $SERVER /usr/local/bin/k3s-uninstall.sh
+```
+
+### Install a Fresh Cluster
+
+> [!NOTE]
+> First ensure the previous cluster is uninstalled - see previous section
+
+This specific installation will do the following:
+
+* Disable the default Ingress controller that ships with K3s (`Traefik`).
+* Force `NodePorts` to listen on the Host network enabling us to more easily configure port forwarding from the Host to the cluster ingress points.
+
+Commands:
+
+```bash
+cat <<EOF > /tmp/k3s_install.sh
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server" sh -s - --disable=traefik --kubelet-arg="node-ip=0.0.0.0"
+sudo cp -vf /etc/rancher/k3s/k3s.yaml /tmp/k3s.yaml
+sudo chown $USER:$USER /tmp/k3s.yaml
+EOF
+
+scp /tmp/k3s_install.sh $SERVER:/tmp/
+
+ssh $SERVER "chmod 700 /tmp/k3s_install.sh && sudo /tmp/k3s_install.sh"
+```
+
+On any other system you need the `KUBECONFIG`, run:
+
+```bash
+# [OPTIONAL] Only required if your Kubernetes cluster
+#            is not running on your local machine
+
+scp $SERVER:/tmp/k3s.yaml ~/
+
+sed -i "s/127.0.0.1/${SERVER}/g" $HOME/k3s.yaml
+```
+
+> [!NOTE]
+> Once the `k3s.yaml` is copied, you need to update the IP address of the server in the file
+
+Quick test:
+
+```bash
+kubectl get namespaces
+# Expected Output:
+# ----------------------------------------
+# default           Active   44s
+# kube-node-lease   Active   44s
+# kube-public       Active   44s
+# kube-system       Active   44s
+```
 
 <hr />
 
