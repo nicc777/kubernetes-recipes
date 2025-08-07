@@ -28,7 +28,7 @@ pip3 install -r requirements.txt
 
 | Topics                | Link                                                              | Notes                                                                                        |
 |-----------------------|-------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
-| Index of all examples | [index of examples](./all_examples.md) |  |
+| Bootstrapping Kubernetes | [Bootstrapping Main Index](./bootstrapping/README.md) | Recipes for creating a Kubernetes Cluster in various environments and for various use-cases. |
 | Ingress               | [Ingress and API Gateway Topics](/ingress/README.md) |  |
 | Storage               | [Persisted Volume Topic Index](./persisted_volumes/README.md) | Index page for further content regarding local storage, persisted volumes and related topics |
 | Dynamic Admission Control | [Admission Control Starting Point](./admission_webhooks/README.md) | Go through admission control using a Python based webhook implementation. |
