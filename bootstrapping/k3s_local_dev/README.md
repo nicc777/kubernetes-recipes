@@ -98,6 +98,10 @@ export ROUTE_53_DOMAIN=...
 
 # Your Kubernetes configuration for using kubectl and other tools:
 export KUBECONFIG=$HOME/k3s.yaml
+
+# NFS Server Configuration 
+export NFS_SERVER=...
+export NFS_PATH=...
 EOF
 
 chmod 600 $HOME/.k3s_local_dev_env
@@ -266,6 +270,45 @@ To cleanup the test:
 kubectl delete -f bootstrapping/k3s_local_dev/manifests/02_test_taskrun.yaml
 
 kubectl delete -f bootstrapping/k3s_local_dev/manifests/01_pipeline_administrative_clusterrole_for_tekton.yaml
+```
+
+## Enable the NFS Storage Class in K3s
+
+> [!NOTE]
+> This is an OPTIONAL step, if you want a storage class of NFS available in your cluster for persistent storage.
+
+Run the following commands:
+
+```bash
+cat <<EOF > /tmp/k3s_nfs.yaml
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: nfs
+  namespace: default
+spec:
+  chart: nfs-subdir-external-provisioner
+  repo: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
+  targetNamespace: default
+  set:
+    storageClass.name: nfs
+  valuesContent: |-
+    nfs:
+        server: ${NFS_SERVER}
+        path: ${NFS_PATH}
+        mountOptions:
+        - nfsvers=4
+EOF
+
+kubectl apply -f /tmp/k3s_nfs.yaml
+
+# Validation:
+kubectl get storageclasses
+# Expected Output:
+# ----------------------------------------
+# NAME                   PROVISIONER                                         RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+# local-path (default)   rancher.io/local-path                               Delete          WaitForFirstConsumer   false                  24h
+# nfs                    cluster.local/nfs-nfs-subdir-external-provisioner   Delete          Immediate              true                   37s
 ```
 
 <hr />

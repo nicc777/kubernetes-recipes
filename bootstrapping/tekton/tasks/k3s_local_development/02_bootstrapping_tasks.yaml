@@ -1,8 +1,9 @@
+---
 apiVersion: tekton.dev/v1 # or tekton.dev/v1beta1
 kind: TaskRun
 metadata:
-  name: build-push-task-run-2
-  namespace: development
+  name: k3s-nfs-capability
+  namespace: bootstrapping
 spec:
   serviceAccountName: tekton-cluster-admin-sa
   params:
@@ -10,7 +11,9 @@ spec:
     value: "hello world!"
   taskSpec:
     steps:
-    - name: default
-      image: ubuntu
+    - name: get-namespaces
+      image: bitnami/kubectl:latest
       script: |
-                echo $(params.message)
+        #!/usr/bin/env bash
+        kubectl version
+        kubectl get namespaces
