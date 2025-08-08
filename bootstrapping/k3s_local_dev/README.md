@@ -95,6 +95,8 @@ export LE_R53_SECRET=...
 # Add your domain information below:
 export ROUTE_53_ZONEID=...
 export ROUTE_53_DOMAIN=...
+# Below must be a string suitable for Kubenetes object names. 
+export ROUTE_53_RESOURCE_ID=$(echo ${ROUTE_53_DOMAIN} | sed "s/\./\-/g")
 
 # Your Kubernetes configuration for using kubectl and other tools:
 export KUBECONFIG=$HOME/k3s.yaml
@@ -102,6 +104,9 @@ export KUBECONFIG=$HOME/k3s.yaml
 # NFS Server Configuration 
 export NFS_SERVER=...
 export NFS_PATH=...
+
+# Other
+export EMAIL=...
 EOF
 
 chmod 600 $HOME/.k3s_local_dev_env
@@ -118,6 +123,7 @@ On the server you also need to ensure your user can run certain commands with `s
 ```text
 your-user-name ALL = NOPASSWD: /usr/local/bin/k3s-uninstall.sh
 your-user-name ALL = NOPASSWD: /tmp/k3s_install.sh
+your-user-name ALL = NOPASSWD: /tmp/web-forward-into-k3s.sh
 ```
 
 ## Installing K3s From Scratch
@@ -309,6 +315,226 @@ kubectl get storageclasses
 # NAME                   PROVISIONER                                         RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
 # local-path (default)   rancher.io/local-path                               Delete          WaitForFirstConsumer   false                  24h
 # nfs                    cluster.local/nfs-nfs-subdir-external-provisioner   Delete          Immediate              true                   37s
+```
+
+## Install the Nginx Gateway Fabric
+
+Run the following commands:
+
+```bash
+kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=v1.6.2" | kubectl apply -f -
+
+# The following is the Helm values for our Nginx Gateway Fabric deployment
+cat <<EOF > /tmp/values.yaml
+nginx:
+  service:
+    type: NodePort
+    nodePorts:
+    - port: 30080
+      listenerPort: 80
+    - port: 30443
+      listenerPort: 443
+EOF
+
+# Deploy the Nginx Gateway Fabric:
+helm install ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric --create-namespace -n nginx-gateway -f /tmp/values.yaml
+```
+
+The final effect will be to have a single gateway listening on well known pre-defined `NodePort` TCP ports: 30080 and 30443 respectively.
+
+## Certificate Manager Installation
+
+Installing `cert-manager` with `Helm` is well [documented](https://cert-manager.io/docs/installation/helm/), and it comes down to the following command:
+
+```bash
+cat <<EOF > /tmp/k3s_cert_manager.yaml
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: cert-manager
+  namespace: kube-system
+spec:
+  chart: oci://quay.io/jetstack/charts/cert-manager
+  version: v1.18.2
+  targetNamespace: cert-manager
+  createNamespace: true
+  valuesContent: |-
+    crds:
+      enabled: true
+EOF
+
+kubectl apply -f /tmp/k3s_cert_manager.yaml
+
+# WAIT until all pods are in a running state...
+sleep 60
+
+kubectl get pods -n cert-manager
+
+# !!! If there are issues with the Pods, sort that out first !!!
+
+cat <<EOF > /tmp/k3s_certificates.yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${ROUTE_53_RESOURCE_ID}-route53-creds-secret
+  namespace: cert-manager
+type: Opaque
+stringData:
+  access-key-id: ${LE_R53_KEY}
+  secret-access-key: ${LE_R53_SECRET}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-${ROUTE_53_RESOURCE_ID}
+  namespace: cert-manager
+spec:
+  acme:
+    email: ${EMAIL}
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: ${ROUTE_53_RESOURCE_ID}-issuer-account-key
+    solvers:
+    - dns01:
+        route53:
+          region: eu-central-1
+          accessKeyIDSecretRef:
+            name: ${ROUTE_53_RESOURCE_ID}-route53-creds-secret
+            key: access-key-id
+          secretAccessKeySecretRef:
+            name: ${ROUTE_53_RESOURCE_ID}-route53-creds-secret
+            key: secret-access-key
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-${ROUTE_53_RESOURCE_ID}-certificate
+  namespace: nginx-gateway
+spec:
+  secretName: wildcard-${ROUTE_53_RESOURCE_ID}-tls-secret
+  issuerRef:
+    name: letsencrypt-${ROUTE_53_RESOURCE_ID}
+    kind: ClusterIssuer
+    group: cert-manager.io
+  dnsNames:
+    - "${ROUTE_53_DOMAIN}"
+    - "*.${ROUTE_53_DOMAIN}"
+EOF
+
+kubectl apply -f /tmp/k3s_certificates.yaml
+
+# !!! WAIT for the certificate to be ready !!!
+kubectl get certificates -n nginx-gateway
+# Expected Output:
+# ----------------------------------------
+# NAME                              READY   SECRET                           AGE
+# wildcard-toetzen-nl-certificate   True    wildcard-xxxxxxxxxx-tls-secret   4m10s
+#                                  ^^^^^^^
+
+```
+
+Finally, we can create a secure gateway, with the Tekton Dashboard as our first ingress point.
+
+But first, deploy the `Gateway`:
+
+```bash
+cat <<EOF > /tmp/k3s_gateway.yaml
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: private-gateway
+  namespace: nginx-gateway
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-${ROUTE_53_RESOURCE_ID}
+spec:
+  gatewayClassName: nginx
+  listeners:
+  - name: http
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            shared-gateway-access: "true"
+  - name: https
+    port: 443
+    protocol: HTTPS
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        group: ""
+        name: wildcard-${ROUTE_53_RESOURCE_ID}-tls-secret
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            shared-gateway-access: "true"
+EOF
+
+kubectl apply -f /tmp/k3s_gateway.yaml
+```
+
+If you have not already done so before, also add the `socat` rule to forward all your HTTP and HTTPS traffic to the `Gatewway` `NodePort` end points:
+
+```bash
+cat <<EOF > /tmp/web-forward-into-k3s.sh
+#!/usr/bin/env bash
+
+nohup socat tcp-listen:80,fork tcp:192.168.2.13:30080 &
+nohup socat tcp-listen:443,fork tcp:192.168.2.13:30443 &
+EOF
+
+scp /tmp/web-forward-into-k3s.sh $SERVER:/tmp
+
+ssh $SERVER "chmod 700 /tmp/web-forward-into-k3s.sh && sudo /tmp/web-forward-into-k3s.sh"
+```
+
+Next, create the ingress to the Tekton Dashboard.
+
+> [!IMPORTANT]
+> This is a deployment to a PRIVATE LAN with no Internet Ingress and therefore we create the ingress to the Tekton Dashboard. THIS IS NOT SECURE!  If you are not comfortable with this, or you have a different use-case that may involve multiple users on your LAN, skip this step.
+
+```bash
+# WARNING: Only apply if your are sure
+
+kubectl label namespace tekton-dashboard shared-gateway-access="true" --overwrite
+
+kubectl label namespace tekton-pipelines shared-gateway-access="true" --overwrite
+
+cat <<EOF > /tmp/k3s_route_tekton_dashboard.yaml
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: tekton-route
+  namespace: tekton-pipelines
+spec:
+  parentRefs:
+  - name: private-gateway
+    sectionName: http
+    namespace: nginx-gateway
+  - name: private-gateway
+    sectionName: https
+    namespace: nginx-gateway
+  hostnames:
+  - "tekton.${ROUTE_53_DOMAIN}"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: tekton-dashboard
+      port: 9097
+EOF 
+
+kubectl apply -f /tmp/k3s_route_tekton_dashboard.yaml
 ```
 
 <hr />
