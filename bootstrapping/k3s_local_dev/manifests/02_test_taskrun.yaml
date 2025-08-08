@@ -1,0 +1,18 @@
+apiVersion: tekton.dev/v1 # or tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: build-push-task-run-1
+  namespace: development
+spec:
+  serviceAccountName: tekton-cluster-admin-sa
+  params:
+  - name: message
+    value: "hello world!"
+  taskSpec:
+    steps:
+    - name: get-namespaces
+      image: bitnami/kubectl:latest
+      script: |
+        #!/usr/bin/env bash
+        kubectl version
+        kubectl get namespaces

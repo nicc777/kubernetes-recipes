@@ -1,0 +1,16 @@
+apiVersion: tekton.dev/v1 # or tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: build-push-task-run-2
+  namespace: development
+spec:
+  serviceAccountName: tekton-cluster-admin-sa
+  params:
+  - name: message
+    value: "hello world!"
+  taskSpec:
+    steps:
+    - name: default
+      image: ubuntu
+      script: |
+                echo $(params.message)

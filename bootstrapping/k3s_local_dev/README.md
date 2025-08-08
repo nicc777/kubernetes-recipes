@@ -29,11 +29,11 @@ On this page are instructions to setup the following components on a system host
 | `cert-manager` | [home](https://cert-manager.io/) and [documentation](https://cert-manager.io/docs/) and [GitHub Repository Index](https://github.com/cert-manager) |
 | `Nginx` Gateway Fabrix | [documentation](https://docs.nginx.com/nginx-gateway-fabric/) and [GitHub](https://github.com/nginx/nginx-gateway-fabric) |
 | `ArgoCD` | [home](https://argoproj.github.io/cd/) and [documentation](https://argo-cd.readthedocs.io/en/stable/) and [GitHub](https://github.com/argoproj/argo-cd) |
-| `Tekton` | [home](https://tekton.dev/) and [documentation](https://tekton.dev/docs/) and [GitHub Repository Index](https://github.com/tektoncd) |
+| `Tekton` | [home](https://tekton.dev/) and [documentation](https://tekton.dev/docs/) and [GitHub Repository Index](https://github.com/tektoncd) and [Operator Installation Instruction](https://github.com/tektoncd/operator/blob/main/docs/install.md) |
 | `Gitea` | [home](https://about.gitea.com/) and [documentation](https://docs.gitea.com/) |
 | `kube-prometheus` | [home](https://prometheus-operator.dev/) and [GitHub](https://github.com/prometheus-operator/kube-prometheus) |
 | `BotKube` | [home](https://botkube.io/) and [documentation](https://docs.botkube.io/) |
-| `keptn` | [home](https://keptn.sh/stable/) and [documentation](https://keptn.sh/stable/docs/) and [GitHub](https://github.com/keptn/lifecycle-toolkit)
+| `keptn` | [home](https://keptn.sh/stable/) and [documentation](https://keptn.sh/stable/docs/) and [GitHub](https://github.com/keptn/lifecycle-toolkit) |
 
 ## Minimum Requirements
 
@@ -185,6 +185,87 @@ kubectl get namespaces
 # kube-node-lease   Active   44s
 # kube-public       Active   44s
 # kube-system       Active   44s
+```
+
+## Install `Tekton`
+
+To install Tekton, run the following:
+
+```bash
+kubectl apply -f https://storage.googleapis.com/tekton-releases/operator/latest/release.yaml
+
+# Give it a minute or so for the operator to settle, 
+# then check that all pods are running:
+
+kubectl get pods -n tekton-operator
+# Expected Output:
+# ----------------------------------------
+# NAME                                       READY   STATUS    RESTARTS   AGE
+# tekton-operator-79cb6db4df-skgr5           2/2     Running   0          5m52s
+# tekton-operator-webhook-58ddc6d6c4-8zgmf   1/1     Running   0          5m52s
+
+
+kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
+sleep 60
+kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
+sleep 60
+kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
+sleep 60
+kubectl apply --filename https://storage.googleapis.com/tekton-releases/dashboard/latest/release-full.yaml
+sleep 60
+
+# Temporarily port-forward to the Dashboard end ensure all is working:
+kubectl port-forward service/tekton-dashboard --address 0.0.0.0 -n tekton-pipelines 9097:9097
+
+open http://localhost:9097/
+```
+
+### Testing and Validating the Installation
+
+Apply the following two manifests:
+
+```bash
+# Use the kubectlctx tools to set the working namespace 
+kubens develop
+
+# Apply the manifests:
+kubectl apply -f bootstrapping/k3s_local_dev/manifests/01_pipeline_administrative_clusterrole_for_tekton.yaml
+
+kubectl apply -f bootstrapping/k3s_local_dev/manifests/02_test_taskrun.yaml
+```
+
+If you still have the web browser open on the Tekton dashboard, you should notice the following:
+
+![dashboard 01](./01_taskrun_expected_result.png)
+
+Another way to check is via the command line:
+
+```bash
+kubectl logs build-push-task-run-1-pod
+# Expected Output:
+# ----------------------------------------
+# Defaulted container "step-get-namespaces" out of: step-get-namespaces, prepare (init), place-scripts (init)
+# Client Version: v1.33.3
+# Kustomize Version: v5.6.0
+# Server Version: v1.33.3+k3s1
+# NAME                         STATUS   AGE
+# default                      Active   4h44m
+# development                  Active   62m
+# kube-node-lease              Active   4h44m
+# kube-public                  Active   4h44m
+# kube-system                  Active   4h44m
+# tekton-dashboard             Active   121m
+# tekton-operator              Active   140m
+# tekton-pipelines             Active   140m
+# tekton-pipelines-resolvers   Active   127m
+```
+
+To cleanup the test:
+
+```bash
+kubectl delete -f bootstrapping/k3s_local_dev/manifests/02_test_taskrun.yaml
+
+kubectl delete -f bootstrapping/k3s_local_dev/manifests/01_pipeline_administrative_clusterrole_for_tekton.yaml
 ```
 
 <hr />
