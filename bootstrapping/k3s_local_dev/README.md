@@ -23,6 +23,14 @@ On this page are instructions to setup the following components on a system host
 | `Botkube` | Messaging about cluster events in Slack |
 | `keptn` | DevOps monitoring|
 
+### Basic Setup
+
+The recipe assumes the following basic setup:
+
+![basic setup](./k3_local_dev_design-Basic_Concept.png)
+
+Some variations can be tollerated, notably that the target server and developer laptop may also be one and the same system.
+
 ## Component Project Pages and Further Information
 
 | Component | URLs |
