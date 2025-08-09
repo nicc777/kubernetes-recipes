@@ -602,7 +602,7 @@ spec:
         value: /
     backendRefs:
     - name: argocd-server
-      port: 80
+      port: 443
 EOF
 
 kubectl apply -f /tmp/k3s_route_argocd.yaml
