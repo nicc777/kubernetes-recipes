@@ -259,7 +259,7 @@ If you still have the web browser open on the Tekton dashboard, you should notic
 Another way to check is via the command line:
 
 ```bash
-kubectl logs build-push-task-run-1-pod
+kubectl logs build-push-task-run-1-pod -n development
 # Expected Output:
 # ----------------------------------------
 # Defaulted container "step-get-namespaces" out of: step-get-namespaces, prepare (init), place-scripts (init)
