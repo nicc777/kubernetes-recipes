@@ -316,6 +316,8 @@ EOF
 
 kubectl apply -f /tmp/k3s_nfs.yaml
 
+# Give it a minute or so for the StorageClass to be added
+
 # Validation:
 kubectl get storageclasses
 # Expected Output:
@@ -508,6 +510,9 @@ Next, create the ingress to the Tekton Dashboard.
 > [!IMPORTANT]
 > This is a deployment to a PRIVATE LAN with no Internet Ingress and therefore we create the ingress to the Tekton Dashboard. THIS IS NOT SECURE!  If you are not comfortable with this, or you have a different use-case that may involve multiple users on your LAN, skip this step.
 
+> [!NOTE]
+> Ensure a DNS A record is created for the sub-domain `tekton` and that it points to the server's private IP address on the LAN.
+
 ```bash
 # WARNING: Only apply if your are sure
 
@@ -540,9 +545,21 @@ spec:
     backendRefs:
     - name: tekton-dashboard
       port: 9097
-EOF 
+EOF
 
 kubectl apply -f /tmp/k3s_route_tekton_dashboard.yaml
+
+open https://tekton.${ROUTE_53_DOMAIN}/
+```
+
+The Tekton Dashboard should now open with a trusted certificate.
+
+## Installing ArgoCD
+
+The installation can be handled by Tekton:
+
+```bash
+kubectl apply -f bootstrapping/k3s_local_dev/manifests/03_install_argocd.yaml
 ```
 
 <hr />

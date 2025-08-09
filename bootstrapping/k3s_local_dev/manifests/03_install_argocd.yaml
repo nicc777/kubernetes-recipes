@@ -1,0 +1,58 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: development
+  labels:
+    name: development
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-cluster-admin-sa
+  namespace: development
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tekton-pipelines-admin-clusterrole
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tekton-pipelines-admin-clusterrolebinding
+subjects:
+- kind: ServiceAccount
+  name: tekton-cluster-admin-sa
+  namespace: development
+roleRef:
+  kind: ClusterRole
+  name: tekton-pipelines-admin-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: tekton.dev/v1 # or tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: argocd-install-tr
+  namespace: development
+spec:
+  serviceAccountName: tekton-cluster-admin-sa
+  taskSpec:
+    steps:
+    - name: install-argocd
+      image: bitnami/kubectl:latest
+      script: |
+        #!/usr/bin/env bash
+        kubectl create namespace argocd
+        kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.0.12/manifests/install.yaml
+        sleep 30
+        PW=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo)
+        echo "----------------------------------------"
+        echo
+        echo "PASSWORD: ${PW}"
+        echo
+        echo "----------------------------------------"
