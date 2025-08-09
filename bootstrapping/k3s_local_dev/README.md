@@ -573,61 +573,18 @@ kubectl logs pod/argocd-install-tr-pod -n development  | grep PASSWORD | awk '{p
 > [!NOTE]
 > Ensure a DNS A record is created for `argocd` that resolves to the local LAN address of the server.
 
-Next, create the `HTTPRoute` and related resources to allow access to the ArgoCD web UI:
+<!-- Next, create the `HTTPRoute` and related resources to allow access to the ArgoCD web UI: -->
+
+> [!IMPORTANT]
+> I still need to resolve the issue with the Ingress configuration. I need to add trusted backend certificates in order to properly hookup the service. For now, only a local port-forward session is possible.
 
 ```bash
 kubectl label namespace argocd shared-gateway-access="true" --overwrite
 
-cat <<EOF > /tmp/k3s_tls_passthrough_gateway_argocd.yaml
----
-apiVersion: gateway.networking.k8s.io/v1beta1
-kind: Gateway
-metadata:
-  name: argocd-gateway
-  namespace: nginx-gateway
-spec:
-  gatewayClassName: nginx
-  listeners:
-  - name: tls
-    port: 443
-    protocol: TLS
-    hostname: "argocd.${ROUTE_53_DOMAIN}"
-    allowedRoutes:
-      namespaces:
-        from: Selector
-        selector:
-          matchLabels:
-            shared-gateway-access: "true"
-      kinds:
-        - kind: TLSRoute
-    tls:
-      mode: Passthrough
-EOF
+# TEMPORARY SOLUTION: 
+kubectl port-forward service/argocd-server --address 0.0.0.0 -n argocd 9443:443
 
-k apply -f /tmp/k3s_tls_passthrough_gateway_argocd.yaml 
-
-cat <<EOF > /tmp/k3s_route_argocd.yaml
----
-apiVersion: gateway.networking.k8s.io/v1alpha2
-kind: TLSRoute
-metadata:
-  name: tls-passthrough-to-argocd
-  namespace: argocd
-spec:
-  parentRefs:
-  - name: argocd-gateway
-    namespace: nginx-gateway
-  hostnames:
-  - "argocd.${ROUTE_53_DOMAIN}"
-  rules:
-  - backendRefs:
-    - name: argocd-server
-      port: 443
-EOF
-
-kubectl apply -f /tmp/k3s_route_argocd.yaml
-
-open https://argocd.${ROUTE_53_DOMAIN}/
+open https://localhost:9443/
 ```
 
 <hr />
