@@ -562,6 +562,54 @@ The installation can be handled by Tekton:
 kubectl apply -f bootstrapping/k3s_local_dev/manifests/03_install_argocd.yaml
 ```
 
+The ArgoCD `admin` password will be in the Task Run log which can be viewed in the Tekton dashboard.
+
+Alternatively, run the following:
+
+```bash
+kubectl logs pod/argocd-install-tr-pod -n development  | grep PASSWORD | awk '{print $2}'
+```
+
+> [!NOTE]
+> Ensure a DNS A record is created for `argocd` that resolves to the local LAN address of the server.
+
+Next, create the `HTTPRoute` and related resources ro ingress:
+
+```bash
+kubectl label namespace argocd shared-gateway-access="true" --overwrite
+
+cat <<EOF > /tmp/k3s_route_argocd.yaml
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argocd-route
+  namespace: argocd
+spec:
+  parentRefs:
+  - name: private-gateway
+    sectionName: http
+    namespace: nginx-gateway
+  - name: private-gateway
+    sectionName: https
+    namespace: nginx-gateway
+  hostnames:
+  - "argocd.${ROUTE_53_DOMAIN}"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: argocd-server
+      port: 80
+EOF
+
+kubectl apply -f /tmp/k3s_route_argocd.yaml
+
+open https://argocd.${ROUTE_53_DOMAIN}/
+```
+
 <hr />
 
 [main index](../../README.md) | [bootstrap menu](../README.md)
