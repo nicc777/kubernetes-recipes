@@ -5,6 +5,9 @@
 
 # Bootstrapping K3s on a Single Host on a Private LAN
 
+> [!INFO]
+> The process still needs to be streamlined, and therefore the current documented process may appear more manual than _Infrastructure-as-Code_ for now.
+
 On this page are instructions to setup the following components on a system hosted on a private LAN:
 
 | Component | Use Case |
