@@ -246,9 +246,6 @@ open http://localhost:9097/
 Apply the following two manifests:
 
 ```bash
-# Use the kubectlctx tools to set the working namespace 
-kubens develop
-
 # Apply the manifests:
 kubectl apply -f bootstrapping/k3s_local_dev/manifests/01_pipeline_administrative_clusterrole_for_tekton.yaml
 
