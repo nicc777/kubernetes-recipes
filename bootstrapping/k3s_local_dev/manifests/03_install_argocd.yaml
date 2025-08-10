@@ -50,9 +50,31 @@ spec:
         kubectl create namespace argocd
         kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.0.12/manifests/install.yaml
         sleep 30
+
         PW=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo)
         echo "----------------------------------------"
         echo
         echo "PASSWORD: ${PW}"
+        echo
+        echo "----------------------------------------"
+
+        cat <<EOF > fix_for_ingress.yaml
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          labels:
+            app.kubernetes.io/name: argocd-cmd-params-cm
+            app.kubernetes.io/part-of: argocd
+          name: argocd-cmd-params-cm
+        data:
+          server.insecure: "true"
+        EOF
+
+        kubectl apply -y fix_for_ingress.yaml
+
+        kubectl rollout restart deployment argocd-server -n argocd
+
+        echo
+        echo "                    DONE"
         echo
         echo "----------------------------------------"

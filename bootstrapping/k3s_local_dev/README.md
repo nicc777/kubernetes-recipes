@@ -241,14 +241,23 @@ kubectl port-forward service/tekton-dashboard --address 0.0.0.0 -n tekton-pipeli
 open http://localhost:9097/
 ```
 
+As a final step, also import the environment file as a secret for use by Tekton pipelines and tasks:
+
+```bash
+kubectl apply -f bootstrapping/k3s_local_dev/manifests/01_pipeline_administrative_clusterrole_for_tekton.yaml
+
+cp -vf $HOME/.k3s_local_dev_env /tmp/task_env
+
+sed -i "s/export //g" /tmp/tasj_env
+
+kubectl create secret generic env_secret --from-env-file=/tmp/task_env -n development
+```
+
 ### Testing and Validating the Installation
 
 Apply the following two manifests:
 
 ```bash
-# Apply the manifests:
-kubectl apply -f bootstrapping/k3s_local_dev/manifests/01_pipeline_administrative_clusterrole_for_tekton.yaml
-
 kubectl apply -f bootstrapping/k3s_local_dev/manifests/02_test_taskrun.yaml
 ```
 
@@ -281,9 +290,22 @@ kubectl logs build-push-task-run-1-pod -n development
 To cleanup the test:
 
 ```bash
+# OPTIONAL...
 kubectl delete -f bootstrapping/k3s_local_dev/manifests/02_test_taskrun.yaml
+```
 
-kubectl delete -f bootstrapping/k3s_local_dev/manifests/01_pipeline_administrative_clusterrole_for_tekton.yaml
+### Preparing the Bootstrapping Pipelines / Tasks
+
+Next, we will prepare the bootstrapping namespace and resources to deploy the rest of the required services.
+
+Start bu running the following:
+
+```bash
+kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/01_bootstrapping_rbac.yaml
+
+kubectl create secret generic env_secret --from-env-file=/tmp/task_env -n bootstrapping
+
+
 ```
 
 ## Enable the NFS Storage Class in K3s
@@ -573,18 +595,42 @@ kubectl logs pod/argocd-install-tr-pod -n development  | grep PASSWORD | awk '{p
 > [!NOTE]
 > Ensure a DNS A record is created for `argocd` that resolves to the local LAN address of the server.
 
-<!-- Next, create the `HTTPRoute` and related resources to allow access to the ArgoCD web UI: -->
-
 > [!IMPORTANT]
 > I still need to resolve the issue with the Ingress configuration. I need to add trusted backend certificates in order to properly hookup the service. For now, only a local port-forward session is possible.
 
 ```bash
 kubectl label namespace argocd shared-gateway-access="true" --overwrite
 
-# TEMPORARY SOLUTION: 
-kubectl port-forward service/argocd-server --address 0.0.0.0 -n argocd 9443:443
+cat <<EOF > /tmp/k3s_route_argocd.yaml
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argocd-route
+  namespace: argocd
+spec:
+  parentRefs:
+  - name: private-gateway
+    sectionName: http
+    namespace: nginx-gateway
+  - name: private-gateway
+    sectionName: https
+    namespace: nginx-gateway
+  hostnames:
+  - "argocd.${ROUTE_53_DOMAIN}"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: argocd-server
+      port: 80
+EOF
 
-open https://localhost:9443/
+kubectl apply -f /tmp/k3s_route_argocd.yaml
+
+open https://argocd.${ROUTE_53_DOMAIN}/
 ```
 
 <hr />
