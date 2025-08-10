@@ -233,7 +233,7 @@ sleep 60
 kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
 sleep 60
 kubectl apply --filename https://storage.googleapis.com/tekton-releases/dashboard/latest/release-full.yaml
-sleep 60
+sleep 10
 
 # Temporarily port-forward to the Dashboard end ensure all is working:
 kubectl port-forward service/tekton-dashboard --address 0.0.0.0 -n tekton-pipelines 9097:9097
@@ -306,79 +306,33 @@ kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/01_bootstrappi
 kubectl create secret generic env-secret --from-env-file=/tmp/task_env -n bootstrapping
 ```
 
-## Enable the NFS Storage Class in K3s
+## Run the Provisioning Pipeline
 
-> [!NOTE]
-> This is an OPTIONAL step, if you want a storage class of NFS available in your cluster for persistent storage.
+The rest of the bootstrap process is handled by Tekton.
 
-Run the following commands to provision the NFS storage class:
+You can open the Tekton Dashboard using the port-forwarder approach shown earlier. The DNS with the Gateway can be used after the bootstrap process is complete.
+
+Run the following:
 
 ```bash
-kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/03_provision_nfs.yaml
+kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/02_provision_k3s_local.yaml
+```
 
-# Validation:
-kubectl get storageclasses
+Check the status and ensure the `SUCCEEDED` column has the value `True`:
+
+```bash
+kubectl get pipelineruns -n bootstrapping
 # Expected Output:
 # ----------------------------------------
-# NAME                   PROVISIONER                                         RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
-# local-path (default)   rancher.io/local-path                               Delete          WaitForFirstConsumer   false                  24h
-# nfs                    cluster.local/nfs-nfs-subdir-external-provisioner   Delete          Immediate              true                   37s
+# NAME            SUCCEEDED   REASON      STARTTIME   COMPLETIONTIME
+# bootstrap-run   True        Succeeded   7m12s       4m48s
 ```
-
-## Install the Nginx Gateway Fabric
-
-Run the following commands:
-
-```bash
-kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=v1.6.2" | kubectl apply -f -
-
-# The following is the Helm values for our Nginx Gateway Fabric deployment
-cat <<EOF > /tmp/values.yaml
-nginx:
-  service:
-    type: NodePort
-    nodePorts:
-    - port: 30080
-      listenerPort: 80
-    - port: 30443
-      listenerPort: 443
-EOF
-
-# Deploy the Nginx Gateway Fabric:
-helm install ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric --create-namespace -n nginx-gateway -f /tmp/values.yaml
-```
-
-The final effect will be to have a single gateway listening on well known pre-defined `NodePort` TCP ports: 30080 and 30443 respectively.
 
 ## Certificate Manager Installation
 
-Installing `cert-manager` with `Helm` is well [documented](https://cert-manager.io/docs/installation/helm/), and it comes down to the following command:
+Prepare the certificates:
 
 ```bash
-cat <<EOF > /tmp/k3s_cert_manager.yaml
-apiVersion: helm.cattle.io/v1
-kind: HelmChart
-metadata:
-  name: cert-manager
-  namespace: kube-system
-spec:
-  chart: oci://quay.io/jetstack/charts/cert-manager
-  version: v1.18.2
-  targetNamespace: cert-manager
-  createNamespace: true
-  valuesContent: |-
-    crds:
-      enabled: true
-EOF
-
-kubectl apply -f /tmp/k3s_cert_manager.yaml
-
-# WAIT until all pods are in a running state...
-sleep 60
-
-kubectl get pods -n cert-manager
-
-# !!! If there are issues with the Pods, sort that out first !!!
 
 cat <<EOF > /tmp/k3s_certificates.yaml
 ---

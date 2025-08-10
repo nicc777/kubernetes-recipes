@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1 # or tekton.dev/v1beta1
 kind: TaskRun
 metadata:
-  name: k3s-nfs-capability
+  name: testting-taskruns
   namespace: bootstrapping
 spec:
   serviceAccountName: tekton-cluster-admin-sa

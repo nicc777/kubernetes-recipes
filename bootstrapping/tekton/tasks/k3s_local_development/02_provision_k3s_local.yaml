@@ -1,0 +1,335 @@
+---
+# Using a local filesystem as per K3s example:
+# https://docs.k3s.io/storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-task-storage
+  namespace: bootstrapping
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: prepare-helm-executable
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: check-helm
+    image: debian:bookworm
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      mkdir -p $XDG_CACHE_HOME || true
+      chmod 777 $XDG_CACHE_HOME
+      FILE=$(workspaces.shared-data.path)/helm
+      if [ -f "$FILE" ]; then
+        echo "Helm Executable is available..."
+      else
+        apt update && apt install -y wget
+        wget https://get.helm.sh/helm-v3.17.4-linux-amd64.tar.gz
+        tar xzf helm-v3.17.4-linux-amd64.tar.gz
+        mv -vf linux-amd64/helm $(workspaces.shared-data.path)/helm
+        echo "Helm installed"
+      fi
+      $FILE version
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: nfs-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-values
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "Creating values file..."
+      cat <<EOF > $(workspaces.shared-data.path)/nfs-values.yaml
+      nfs:
+        server: $(workspaces.ws-env.path)/NFS_SERVER
+        path: $(workspaces.ws-env.path)/NFS_PATH
+        mountOptions:
+        - nfsvers=4
+      EOF
+      ls -lahrt $(workspaces.shared-data.path)/nfs-values.yaml
+      echo
+      echo "----------------------------------------"
+      cat $(workspaces.shared-data.path)/nfs-values.yaml
+      echo
+      echo "----------------------------------------"
+      # DONE
+  - name: validate-current-storage-classes
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      count=$(kubectl get storageclasses | grep -v NAME | grep nfs | wc -l)
+      if [ "$count" -eq 0 ]; then
+        touch $(workspaces.shared-data.path)/do_nfs_install
+      fi
+  - name: install-nfs
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      FILE="$(workspaces.shared-data.path)/do_nfs_install"
+      export HELM=$(workspaces.shared-data.path)/helm
+      if [ -f "$FILE" ]; then
+        $HELM repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+        $HELM repo update
+        $HELM install nfs nfs-subdir-external-provisioner/nfs-subdir-external-provisioner -f $(workspaces.shared-data.path)/nfs-values.yaml
+        echo "Sleeping 30 seconds to allow the StorageClass to be created..."
+        sleep 30
+      else
+        echo "The NFS Storage class may already be installed. Skipping installation."
+      fi
+      echo "Installation of the NFS StorageClass Completed"
+  - name: validate-nfs-storageclass-is-available
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl get storageclasses
+      count=$(kubectl get storageclasses | grep -v NAME | grep nfs |  wc -l)
+      if [ "$count" -eq 0 ]; then
+        echo "Error: Seems the NFS StorageClass somehow failed to install" >&2
+        exit 1
+      fi
+      echo "NFS Storage Class Installed"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: nginx-gateway-fabric-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: install-ngf-required-crds
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=v1.6.2" | kubectl apply -f -
+  - name: prepare-values
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      cat <<EOF > $(workspaces.shared-data.path)/ngf-values.yaml
+      nginx:
+        service:
+          type: NodePort
+          nodePorts:
+          - port: 30080
+            listenerPort: 80
+          - port: 30443
+            listenerPort: 443
+      EOF
+  - name: install-ngf
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      ls -lahrt $(workspaces.shared-data.path)/
+      export HELM=$(workspaces.shared-data.path)/helm
+      $HELM install ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric --create-namespace -n nginx-gateway -f $(workspaces.shared-data.path)/ngf-values.yaml
+      sleep 10
+      count=$($HELM list --all-namespaces | grep ngf | wc -l)
+      if [ "$count" -eq 0 ]; then
+        echo "Error: Seems the Nginx Gateway Fabrix somehow failed to install" >&2
+        exit 1
+      fi
+      echo "Installation of the Nginx Gateway Fabric Completed"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: install-cert-manager-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-cert-manager-manifest
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      cat <<EOF > $(workspaces.shared-data.path)/k3s_cert_manager.yaml
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChart
+      metadata:
+        name: cert-manager
+        namespace: kube-system
+      spec:
+        chart: oci://quay.io/jetstack/charts/cert-manager
+        version: v1.18.2
+        targetNamespace: cert-manager
+        createNamespace: true
+        valuesContent: |-
+          crds:
+            enabled: true
+      EOF
+  - name: install-cert-manager
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl apply -f $(workspaces.shared-data.path)/k3s_cert_manager.yaml
+  - name: validate-cert-manager-installation
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      sleep 60
+      kubectl get pods -n cert-manager
+      v1=$(kubectl get pods -n cert-manager | grep -v NAME | wc -l)
+      if [ "$v1" -eq 0 ]; then
+        echo "Error: At least some Pods should have been running by now - investigate !!" >&2
+        echo
+        echo
+        kuberctl get namespaces
+        echo
+        echo
+        kubectl get helmcharts --all-namespaces
+        exit 1
+      fi
+      v2=$(kubectl get pods -n cert-manager | grep -v NAME | egrep "Running|Completed" | wc -l)
+      if [ "$v1" -ne "$v2" ]; then
+        echo "Error: Not all pods are in a ready success - can not continue"
+        exit 1
+      fi
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: end-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: print-done-message
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "Created Files:"
+      echo "-------------"
+      echo
+      ls -lahrt $(workspaces.shared-data.path)/*.yaml
+      echo
+      echo
+      echo "DONE !!!"
+
+# ################################################################################
+# 
+#           TEMPLATES as ConfigMap Objects 
+#
+# ################################################################################
+#
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dummy-cm
+  namespace: bootstrapping
+data:
+  test.data: tasks are my jam
+
+# ################################################################################
+# 
+#           PIPELINE 
+#
+# ################################################################################
+
+
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: bootstrap-k3s-pipeline
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: ws-env
+  - name: shared-data
+  tasks:
+  - name: run-prepare-helm-executable
+    taskRef:
+      name: prepare-helm-executable
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-nfs-task
+    runAfter:
+    - run-prepare-helm-executable
+    taskRef:
+      name: nfs-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-nginx-gateway-fabric-task
+    runAfter:
+    - run-nfs-task
+    taskRef:
+      name: nginx-gateway-fabric-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-install-cert-manager-task
+    runAfter:
+    - run-nginx-gateway-fabric-task
+    taskRef:
+      name: install-cert-manager-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-end-task
+    runAfter:
+    - run-install-cert-manager-task
+    taskRef:
+      name: end-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+---
+#apiVersion: tekton.dev/v1
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: bootstrap-run
+  namespace: bootstrapping
+spec:
+  serviceAccountName: tekton-cluster-admin-sa
+  pipelineRef:
+    name: bootstrap-k3s-pipeline
+  workspaces:
+  - name: shared-data
+    persistentVolumeClaim:
+      claimName: shared-task-storage
+  - name: ws-env
+    secret:
+      secretName: env-secret
