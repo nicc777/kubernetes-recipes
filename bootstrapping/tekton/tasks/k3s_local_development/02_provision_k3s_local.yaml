@@ -31,6 +31,7 @@ spec:
     script: |
       #!/usr/bin/env bash
       export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
       mkdir -p $XDG_CACHE_HOME || true
       chmod 777 $XDG_CACHE_HOME
       FILE=$(workspaces.shared-data.path)/helm
@@ -44,6 +45,11 @@ spec:
         echo "Helm installed"
       fi
       $FILE version
+      count=$($FILE version | grep version | wc -l)
+      if [ "$count" -eq 0 ]; then
+        echo "Error: Seems helm somehow failed to install" >&2
+        exit 1
+      fi
 ---
 apiVersion: tekton.dev/v1
 kind: Task
@@ -62,10 +68,12 @@ spec:
     script: |
       #!/usr/bin/env bash
       echo "Creating values file..."
+      export NFS_SERVER=$(head -n 1 $(workspaces.ws-env.path)/NFS_SERVER)
+      export NFS_PATH=$(head -n 1 $(workspaces.ws-env.path)/NFS_PATH)
       cat <<EOF > $(workspaces.shared-data.path)/nfs-values.yaml
       nfs:
-        server: $(workspaces.ws-env.path)/NFS_SERVER
-        path: $(workspaces.ws-env.path)/NFS_PATH
+        server: ${NFS_SERVER}
+        path: ${NFS_PATH}
         mountOptions:
         - nfsvers=4
       EOF
@@ -89,8 +97,16 @@ spec:
     script: |
       #!/usr/bin/env bash
       export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
       FILE="$(workspaces.shared-data.path)/do_nfs_install"
       export HELM=$(workspaces.shared-data.path)/helm
+      echo "----------------------------------------"
+      ls -lahrt $XDG_CACHE_HOME/
+      echo "----------------------------------------"
+      ls -lahrt $(workspaces.shared-data.path)/
+      echo "----------------------------------------"
+      env
+      echo "----------------------------------------"
       if [ -f "$FILE" ]; then
         $HELM repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
         $HELM repo update
@@ -106,8 +122,20 @@ spec:
     script: |
       #!/usr/bin/env bash
       kubectl get storageclasses
-      count=$(kubectl get storageclasses | grep -v NAME | grep nfs |  wc -l)
-      if [ "$count" -eq 0 ]; then
+      loop_count = 0
+      MAX_ITERATIONS=10
+      SUCCEEDED=0
+      while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
+        sleep 10
+        ((loop_count++))
+        echo "Validation iteration #${loop_count}..."
+        count=$(kubectl get storageclasses | grep -v NAME | grep nfs |  wc -l)
+        if [ "$count" -eq 1 ]; then
+          SUCCEEDED=1
+          loop_count=9999
+        fi
+      done
+      if [ "$SUCCEEDED" -eq 0 ]; then
         echo "Error: Seems the NFS StorageClass somehow failed to install" >&2
         exit 1
       fi
@@ -152,10 +180,22 @@ spec:
       ls -lahrt $(workspaces.shared-data.path)/
       export HELM=$(workspaces.shared-data.path)/helm
       $HELM install ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric --create-namespace -n nginx-gateway -f $(workspaces.shared-data.path)/ngf-values.yaml
-      sleep 10
-      count=$($HELM list --all-namespaces | grep ngf | wc -l)
-      if [ "$count" -eq 0 ]; then
-        echo "Error: Seems the Nginx Gateway Fabrix somehow failed to install" >&2
+      loop_count = 0
+      MAX_ITERATIONS=10
+      SUCCEEDED=0
+      while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
+        sleep 10
+        ((loop_count++))
+        echo "Validation iteration #${loop_count}..."
+        # We just need at least ONE pod running
+        count=$(kubectl get pods -n nginx-gateway | grep ngf-nginx-gateway-fabric | grep Running | head -1 | wc -l)
+        if [ "$count" -eq 1 ]; then
+          SUCCEEDED=1
+          loop_count=9999
+        fi
+      done
+      if [ "$SUCCEEDED" -eq 0 ]; then
+        echo "Error: Seems the Nginx Gateway Farbic somehow failed to install" >&2
         exit 1
       fi
       echo "Installation of the Nginx Gateway Fabric Completed"
@@ -201,23 +241,97 @@ spec:
     script: |
       #!/usr/bin/env bash
       sleep 60
-      kubectl get pods -n cert-manager
-      v1=$(kubectl get pods -n cert-manager | grep -v NAME | wc -l)
-      if [ "$v1" -eq 0 ]; then
-        echo "Error: At least some Pods should have been running by now - investigate !!" >&2
-        echo
-        echo
-        kuberctl get namespaces
-        echo
-        echo
-        kubectl get helmcharts --all-namespaces
+      loop_count = 0
+      MAX_ITERATIONS=10
+      SUCCEEDED=0
+      while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
+        sleep 10
+        ((loop_count++))
+        echo "Validation iteration #${loop_count}..."
+        # We just need at least ONE pod running
+        count=$(kubectl get pods -n cert-manager | grep -v NAME | egrep -v "NAME|cainjector|webhook" | grep "cert-manager-" | grep Running | head -1 | wc -l)
+        if [ "$count" -eq 1 ]; then
+          SUCCEEDED=1
+          loop_count=9999
+        fi
+      done
+      if [ "$SUCCEEDED" -eq 0 ]; then
+        kubectl get pods -n cert-manager
+        echo "Error: Seems cert-manager somehow failed to install" >&2
         exit 1
       fi
-      v2=$(kubectl get pods -n cert-manager | grep -v NAME | egrep "Running|Completed" | wc -l)
-      if [ "$v1" -ne "$v2" ]; then
-        echo "Error: Not all pods are in a ready success - can not continue"
-        exit 1
-      fi
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: certificate-generation
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-manifests-for-certificate-generation
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export ID=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_RESOURCE_ID)
+      export DOMAIN=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_DOMAIN)
+      cat <<EOF > $(workspaces.shared-data.path)/k3s_certificates.yaml
+      ---
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: ${ID}-route53-creds-secret
+        namespace: cert-manager
+      type: Opaque
+      stringData:
+        access-key-id: $(workspaces.ws-env.path)/LE_R53_KEY
+        secret-access-key: $(workspaces.ws-env.path)/LE_R53_SECRET
+      ---
+      apiVersion: cert-manager.io/v1
+      kind: ClusterIssuer
+      metadata:
+        name: letsencrypt-${ID}
+        namespace: cert-manager
+      spec:
+        acme:
+          email: $(workspaces.ws-env.path)/EMAIL
+          server: https://acme-v02.api.letsencrypt.org/directory
+          privateKeySecretRef:
+            name: ${ID}-issuer-account-key
+          solvers:
+          - dns01:
+              route53:
+                region: eu-central-1
+                accessKeyIDSecretRef:
+                  name: ${ID}-route53-creds-secret
+                  key: access-key-id
+                secretAccessKeySecretRef:
+                  name: ${ID}-route53-creds-secret
+                  key: secret-access-key
+      ---
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      metadata:
+        name: wildcard-${ID}-certificate
+        namespace: nginx-gateway
+      spec:
+        secretName: wildcard-${ID}-tls-secret
+        issuerRef:
+          name: letsencrypt-${ID}
+          kind: ClusterIssuer
+          group: cert-manager.io
+        dnsNames:
+          - "${DOMAIN"
+          - "*.${DOMAIN}"
+      EOF
+      echo "----------------------------------------"
+      cat $(workspaces.shared-data.path)/k3s_certificates.yaml
+      echo "----------------------------------------"
+
 
 ---
 apiVersion: tekton.dev/v1
@@ -307,9 +421,17 @@ spec:
     workspaces:
     - name: ws-env
     - name: shared-data
-  - name: run-end-task
+  - name: run-certificate-generation
     runAfter:
     - run-install-cert-manager-task
+    taskRef:
+      name: certificate-generation
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-end-task
+    runAfter:
+    - run-certificate-generation
     taskRef:
       name: end-task
     workspaces:
