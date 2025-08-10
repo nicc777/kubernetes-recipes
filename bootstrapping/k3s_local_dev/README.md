@@ -248,7 +248,7 @@ kubectl apply -f bootstrapping/k3s_local_dev/manifests/01_pipeline_administrativ
 
 cp -vf $HOME/.k3s_local_dev_env /tmp/task_env
 
-sed -i "s/export //g" /tmp/tasj_env
+sed -i "s/export //g" /tmp/task_env
 
 kubectl create secret generic env_secret --from-env-file=/tmp/task_env -n development
 ```
