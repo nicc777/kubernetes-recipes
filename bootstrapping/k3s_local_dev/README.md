@@ -304,8 +304,6 @@ Start bu running the following:
 kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/01_bootstrapping_rbac.yaml
 
 kubectl create secret generic env_secret --from-env-file=/tmp/task_env -n bootstrapping
-
-
 ```
 
 ## Enable the NFS Storage Class in K3s
@@ -313,32 +311,10 @@ kubectl create secret generic env_secret --from-env-file=/tmp/task_env -n bootst
 > [!NOTE]
 > This is an OPTIONAL step, if you want a storage class of NFS available in your cluster for persistent storage.
 
-Run the following commands:
+Run the following commands to provision the NFS storage class:
 
 ```bash
-cat <<EOF > /tmp/k3s_nfs.yaml
-apiVersion: helm.cattle.io/v1
-kind: HelmChart
-metadata:
-  name: nfs
-  namespace: default
-spec:
-  chart: nfs-subdir-external-provisioner
-  repo: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
-  targetNamespace: default
-  set:
-    storageClass.name: nfs
-  valuesContent: |-
-    nfs:
-        server: ${NFS_SERVER}
-        path: ${NFS_PATH}
-        mountOptions:
-        - nfsvers=4
-EOF
-
-kubectl apply -f /tmp/k3s_nfs.yaml
-
-# Give it a minute or so for the StorageClass to be added
+kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/03_provision_nfs.yaml
 
 # Validation:
 kubectl get storageclasses

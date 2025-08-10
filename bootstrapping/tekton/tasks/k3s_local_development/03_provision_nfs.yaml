@@ -64,3 +64,6 @@ spec:
       script: |
         #!/usr/bin/env bash
         cat $(workspaces.ws-storeage.path)/k3s_nfs.yaml
+        kubectl apply -f $(workspaces.ws-storeage.path)/k3s_nfs.yaml
+        sleep 60
+        kubectl get storageclasses
