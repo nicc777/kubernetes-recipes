@@ -298,7 +298,7 @@ kubectl delete -f bootstrapping/k3s_local_dev/manifests/02_test_taskrun.yaml
 
 Next, we will prepare the bootstrapping namespace and resources to deploy the rest of the required services.
 
-Start bu running the following:
+Start by running the following:
 
 ```bash
 kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/01_bootstrapping_rbac.yaml

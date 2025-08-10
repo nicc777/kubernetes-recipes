@@ -20,6 +20,7 @@ metadata:
   namespace: bootstrapping
   name: provision-nfs
 spec:
+  serviceAccountName: tekton-cluster-admin-sa
   workspaces:
     - name: ws-storeage
       persistentVolumeClaim:
