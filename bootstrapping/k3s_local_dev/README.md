@@ -250,7 +250,7 @@ cp -vf $HOME/.k3s_local_dev_env /tmp/task_env
 
 sed -i "s/export //g" /tmp/task_env
 
-kubectl create secret generic env_secret --from-env-file=/tmp/task_env -n development
+kubectl create secret generic env-secret --from-env-file=/tmp/task_env -n development
 ```
 
 ### Testing and Validating the Installation
@@ -303,7 +303,7 @@ Start bu running the following:
 ```bash
 kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/01_bootstrapping_rbac.yaml
 
-kubectl create secret generic env_secret --from-env-file=/tmp/task_env -n bootstrapping
+kubectl create secret generic env-secret --from-env-file=/tmp/task_env -n bootstrapping
 ```
 
 ## Enable the NFS Storage Class in K3s
