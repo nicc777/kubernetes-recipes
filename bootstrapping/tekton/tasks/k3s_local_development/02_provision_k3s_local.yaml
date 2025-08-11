@@ -122,7 +122,7 @@ spec:
     script: |
       #!/usr/bin/env bash
       kubectl get storageclasses
-      loop_count = 0
+      loop_count=0
       MAX_ITERATIONS=10
       SUCCEEDED=0
       while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
@@ -180,7 +180,7 @@ spec:
       ls -lahrt $(workspaces.shared-data.path)/
       export HELM=$(workspaces.shared-data.path)/helm
       $HELM install ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric --create-namespace -n nginx-gateway -f $(workspaces.shared-data.path)/ngf-values.yaml
-      loop_count = 0
+      loop_count=0
       MAX_ITERATIONS=10
       SUCCEEDED=0
       while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
@@ -241,7 +241,7 @@ spec:
     script: |
       #!/usr/bin/env bash
       sleep 60
-      loop_count = 0
+      loop_count=0
       MAX_ITERATIONS=10
       SUCCEEDED=0
       while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
@@ -279,38 +279,46 @@ spec:
       #!/usr/bin/env bash
       export ID=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_RESOURCE_ID)
       export DOMAIN=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_DOMAIN)
+      export SECRET_NAME="${ID}-route53-creds-secret"
+      export CLUSTER_ISSUER_NAME="letsencrypt-${ID}"
+      export ISSUER_ACCOUNT_KEY_NAME="${ID}-issuer-account-key"
+      export ACCESS_KEY=$(head -1 $(workspaces.ws-env.path)/LE_R53_KEY)
+      export SECRET_KEY=$(head -1 $(workspaces.ws-env.path)/LE_R53_SECRET)
+      export EMAIL=$(head -1 $(workspaces.ws-env.path)/EMAIL)
+      export DNS_NAME_1=$DOMAIN
+      export DNS_NAME_2="*.${DOMAIN}"
       cat <<EOF > $(workspaces.shared-data.path)/k3s_certificates.yaml
       ---
       apiVersion: v1
       kind: Secret
       metadata:
-        name: ${ID}-route53-creds-secret
+        name: $SECRET_NAME
         namespace: cert-manager
       type: Opaque
       stringData:
-        access-key-id: $(workspaces.ws-env.path)/LE_R53_KEY
-        secret-access-key: $(workspaces.ws-env.path)/LE_R53_SECRET
+        access-key-id: $ACCESS_KEY
+        secret-access-key: $SECRET_KEY
       ---
       apiVersion: cert-manager.io/v1
       kind: ClusterIssuer
       metadata:
-        name: letsencrypt-${ID}
+        name: $CLUSTER_ISSUER_NAME
         namespace: cert-manager
       spec:
         acme:
-          email: $(workspaces.ws-env.path)/EMAIL
+          email: $EMAIL
           server: https://acme-v02.api.letsencrypt.org/directory
           privateKeySecretRef:
-            name: ${ID}-issuer-account-key
+            name: $ISSUER_ACCOUNT_KEY_NAME
           solvers:
           - dns01:
               route53:
                 region: eu-central-1
                 accessKeyIDSecretRef:
-                  name: ${ID}-route53-creds-secret
+                  name: $SECRET_NAME
                   key: access-key-id
                 secretAccessKeySecretRef:
-                  name: ${ID}-route53-creds-secret
+                  name: $SECRET_NAME
                   key: secret-access-key
       ---
       apiVersion: cert-manager.io/v1
@@ -325,12 +333,37 @@ spec:
           kind: ClusterIssuer
           group: cert-manager.io
         dnsNames:
-          - "${DOMAIN"
-          - "*.${DOMAIN}"
+          - "$DNS_NAME_1"
+          - "$DNS_NAME_2"
       EOF
       echo "----------------------------------------"
       cat $(workspaces.shared-data.path)/k3s_certificates.yaml
       echo "----------------------------------------"
+  - name: apply-certificate-manifest
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl apply -f $(workspaces.shared-data.path)/k3s_certificates.yaml
+      echo "Waiting for certificate to be in a ready state... (maximum 10 minutes approx.)" 
+      loop_count=0
+      MAX_ITERATIONS=60
+      SUCCEEDED=0
+      while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
+        sleep 10
+        ((loop_count++))
+        echo "Validation iteration #${loop_count}..."
+        # The certificate must get to a True status...
+        count=$(kubectl get certificates -n nginx-gateway 2>/dev/null | grep -v NAME | grep "wildcard-" | grep "True" | wc -l)
+        if [ "$count" -eq 1 ]; then
+          SUCCEEDED=1
+          loop_count=9999
+        fi
+      done
+      if [ "$SUCCEEDED" -eq 0 ]; then
+        kubectl get pods -n cert-manager
+        echo "Error: Seems cert-manager somehow failed to install" >&2
+        exit 1
+      fi
 
 
 ---
