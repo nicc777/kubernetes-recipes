@@ -681,7 +681,7 @@ spec:
   # REMEMBER to update the below task dependency once all tasks have been defined...
   - name: run-create-gateway-routes
     runAfter:
-    - deploy-argocd
+    - run-deploy-argocd
     taskRef:
       name: create-gateway-routes
     workspaces:

@@ -123,7 +123,7 @@ export EMAIL=...
 # FORMAT: SET OF record_name,target_namespace,service_name,port
 # RECORD SET seprator is a colon (:)
 # 2x Record Set Example: export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80
-export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097
+export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80
 EOF
 
 chmod 600 $HOME/.k3s_local_dev_env
