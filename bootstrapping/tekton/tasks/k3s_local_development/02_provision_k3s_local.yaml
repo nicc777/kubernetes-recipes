@@ -365,6 +365,75 @@ spec:
         exit 1
       fi
 
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: deploy-primary-gateway
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-manifest
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export ID=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_RESOURCE_ID)
+      cat <<EOF > $(workspaces.shared-data.path)/k3s_gateway.yaml
+      ---
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata:
+        name: private-gateway
+        namespace: nginx-gateway
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-$ID
+      spec:
+        gatewayClassName: nginx
+        listeners:
+        - name: http
+          port: 80
+          protocol: HTTP
+          allowedRoutes:
+            namespaces:
+              from: Selector
+              selector:
+                matchLabels:
+                  shared-gateway-access: "true"
+        - name: https
+          port: 443
+          protocol: HTTPS
+          tls:
+            mode: Terminate
+            certificateRefs:
+            - kind: Secret
+              group: ""
+              name: wildcard-${ID}-tls-secret
+          allowedRoutes:
+            namespaces:
+              from: Selector
+              selector:
+                matchLabels:
+                  shared-gateway-access: "true"
+      EOF
+      echo "----------------------------------------"
+      cat $(workspaces.shared-data.path)/k3s_gateway.yaml
+      echo "----------------------------------------"
+  - name: apply-gateway-manifest
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl apply -f $(workspaces.shared-data.path)/k3s_gateway.yaml
+      echo "----------------------------------------"
+      sleep 10  
+      kubectl get gateways -n nginx-gateway
+      echo "----------------------------------------"
+      sleep 10
+      kubectl describe gateway/private-gateway -n nginx-gateway
 
 ---
 apiVersion: tekton.dev/v1
@@ -462,9 +531,17 @@ spec:
     workspaces:
     - name: ws-env
     - name: shared-data
-  - name: run-end-task
+  - name: run-deploy-primary-gateway
     runAfter:
     - run-certificate-generation
+    taskRef:
+      name: deploy-primary-gateway
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-end-task
+    runAfter:
+    - run-deploy-primary-gateway
     taskRef:
       name: end-task
     workspaces:

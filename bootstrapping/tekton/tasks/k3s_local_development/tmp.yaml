@@ -1,0 +1,53 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: xxx
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-manifest
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: bootstrap-k3s-pipeline-tmp
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: ws-env
+  - name: shared-data
+  tasks:
+  - name: run-xxx
+    taskRef:
+      name: xxx
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+---
+#apiVersion: tekton.dev/v1
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: bootstrap-run-tmp
+  namespace: bootstrapping
+spec:
+  serviceAccountName: tekton-cluster-admin-sa
+  pipelineRef:
+    name: bootstrap-k3s-pipeline-tmp
+  workspaces:
+  - name: shared-data
+    persistentVolumeClaim:
+      claimName: shared-task-storage
+  - name: ws-env
+    secret:
+      secretName: env-secret
