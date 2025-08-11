@@ -439,6 +439,136 @@ spec:
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
+  name: create-gateway-routes
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-manifest-template
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      cat <<EOF > $(workspaces.shared-data.path)/route.yaml
+      ---
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: __ROUTE_NAME__
+        namespace: __NAMESPACE__
+      spec:
+        parentRefs:
+        - name: private-gateway
+          sectionName: http
+          namespace: nginx-gateway
+        - name: private-gateway
+          sectionName: https
+          namespace: nginx-gateway
+        hostnames:
+        - "__TARGET_HOSTNAME__"
+        rules:
+        - matches:
+          - path:
+              type: PathPrefix
+              value: /
+          backendRefs:
+          - name: __SERVICE_NAME__
+            port: __PORT__
+
+      EOF
+  - name: apply-routes
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "Applying routes..."
+      export DOMAIN=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_DOMAIN)
+      export ROUTES=$(head -n 1 $(workspaces.ws-env.path)/ROUTES)
+      OLD_IFS=$IFS
+      IFS=":"
+      for ROUTE in $ROUTES; do
+        echo "Processing Data:  ${ROUTE}"
+        IFS=','
+        read -r RECORD NAMESPACE SERVICE_NAME PORT <<< "$ROUTE"
+        ROUTE_NAME="${RECORD}-route"
+        echo "   record       : ${RECORD}"
+        echo "   namespace    : ${NAMESPACE}"
+        echo "   service name : ${SERVICE_NAME}"
+        echo "   port         : ${PORT}"
+        TARGET_HOSTNAME="${RECORD}.${DOMAIN}"
+        kubectl label namespace $NAMESPACE shared-gateway-access="true" --overwrite
+        cp -vf $(workspaces.shared-data.path)/route.yaml $(workspaces.shared-data.path)/route-working.yaml
+        sed -i "s/__ROUTE_NAME__/${ROUTE_NAME}/g"  $(workspaces.shared-data.path)/route-working.yaml
+        sed -i "s/__NAMESPACE__/${NAMESPACE}/g"  $(workspaces.shared-data.path)/route-working.yaml
+        sed -i "s/__TARGET_HOSTNAME__/${TARGET_HOSTNAME}/g"  $(workspaces.shared-data.path)/route-working.yaml
+        sed -i "s/__SERVICE_NAME__/${SERVICE_NAME}/g"  $(workspaces.shared-data.path)/route-working.yaml
+        sed -i "s/__PORT__/${PORT}/g"  $(workspaces.shared-data.path)/route-working.yaml
+        echo "----------------------------------------"
+        cat $(workspaces.shared-data.path)/route-working.yaml
+        kubectl delete HTTPRoute/$ROUTE_NAME -n $NAMESPACE || true
+        sleep 3
+        kubectl apply -f $(workspaces.shared-data.path)/route-working.yaml
+      done
+      IFS=$OLD_IFS
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: deploy-argocd
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-for-deployment
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      cat <<EOF > $(workspaces.shared-data.path)/fix_for_ingress.yaml
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        labels:
+          app.kubernetes.io/name: argocd-cmd-params-cm
+          app.kubernetes.io/part-of: argocd
+        name: argocd-cmd-params-cm
+        namespace: argocd
+      data:
+        server.insecure: "true"
+      EOF
+      kubectl delete -f $(workspaces.shared-data.path)/fix_for_ingress.yaml || true
+      kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.0.12/manifests/install.yaml || true
+      kubectl delete namespace argocd || true
+  - name: deploy-argocd
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl create namespace argocd
+      kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.0.12/manifests/install.yaml
+      sleep 30
+      PW=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo)
+      echo "----------------------------------------"
+      echo
+      echo "PASSWORD: ${PW}"
+      echo
+      echo "----------------------------------------"
+      kubectl apply -f $(workspaces.shared-data.path)/fix_for_ingress.yaml
+      kubectl rollout restart deployment argocd-server -n argocd
+      echo
+      echo "                    DONE"
+      echo
+      echo "----------------------------------------"
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
   name: end-task
   namespace: bootstrapping
 spec:
@@ -536,6 +666,24 @@ spec:
     - run-certificate-generation
     taskRef:
       name: deploy-primary-gateway
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-deploy-argocd
+    runAfter:
+    - run-deploy-primary-gateway
+    taskRef:
+      name: deploy-argocd
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+
+  # REMEMBER to update the below task dependency once all tasks have been defined...
+  - name: run-create-gateway-routes
+    runAfter:
+    - deploy-argocd
+    taskRef:
+      name: create-gateway-routes
     workspaces:
     - name: ws-env
     - name: shared-data

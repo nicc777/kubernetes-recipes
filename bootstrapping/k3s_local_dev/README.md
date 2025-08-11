@@ -118,6 +118,12 @@ export NFS_PATH=...
 
 # Other
 export EMAIL=...
+
+# DNS Record names to create routes for - comma separated list:
+# FORMAT: SET OF record_name,target_namespace,service_name,port
+# RECORD SET seprator is a colon (:)
+# 2x Record Set Example: export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80
+export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097
 EOF
 
 chmod 600 $HOME/.k3s_local_dev_env
@@ -214,18 +220,7 @@ To install Tekton, run the following:
 
 ```bash
 kubectl apply -f https://storage.googleapis.com/tekton-releases/operator/latest/release.yaml
-
-# Give it a minute or so for the operator to settle, 
-# then check that all pods are running:
-
-kubectl get pods -n tekton-operator
-# Expected Output:
-# ----------------------------------------
-# NAME                                       READY   STATUS    RESTARTS   AGE
-# tekton-operator-79cb6db4df-skgr5           2/2     Running   0          5m52s
-# tekton-operator-webhook-58ddc6d6c4-8zgmf   1/1     Running   0          5m52s
-
-
+sleep 60 
 kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
 sleep 60
 kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
@@ -234,11 +229,19 @@ kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers
 sleep 60
 kubectl apply --filename https://storage.googleapis.com/tekton-releases/dashboard/latest/release-full.yaml
 sleep 10
+```
 
-# Temporarily port-forward to the Dashboard end ensure all is working:
+To test connectivity, temporarily setup a forwarding proxy:
+
+```bash
 kubectl port-forward service/tekton-dashboard --address 0.0.0.0 -n tekton-pipelines 9097:9097
+```
 
+And open a web browser from another terminal session:
+
+```bash
 open http://localhost:9097/
+
 ```
 
 As a final step, also import the environment file as a secret for use by Tekton pipelines and tasks:
@@ -328,53 +331,7 @@ kubectl get pipelineruns -n bootstrapping
 # bootstrap-run   True        Succeeded   7m12s       4m48s
 ```
 
-## Certificate Manager Installation
-
-Finally, we can create a secure gateway, with the Tekton Dashboard as our first ingress point.
-
-But first, deploy the `Gateway`:
-
-```bash
-cat <<EOF > /tmp/k3s_gateway.yaml
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: private-gateway
-  namespace: nginx-gateway
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-${ROUTE_53_RESOURCE_ID}
-spec:
-  gatewayClassName: nginx
-  listeners:
-  - name: http
-    port: 80
-    protocol: HTTP
-    allowedRoutes:
-      namespaces:
-        from: Selector
-        selector:
-          matchLabels:
-            shared-gateway-access: "true"
-  - name: https
-    port: 443
-    protocol: HTTPS
-    tls:
-      mode: Terminate
-      certificateRefs:
-      - kind: Secret
-        group: ""
-        name: wildcard-${ROUTE_53_RESOURCE_ID}-tls-secret
-    allowedRoutes:
-      namespaces:
-        from: Selector
-        selector:
-          matchLabels:
-            shared-gateway-access: "true"
-EOF
-
-kubectl apply -f /tmp/k3s_gateway.yaml
-```
+## Connectivity to the Cluster Gateway
 
 If you have not already done so before, also add the `socat` rule to forward all your HTTP and HTTPS traffic to the `Gatewway` `NodePort` end points:
 
@@ -391,110 +348,14 @@ scp /tmp/web-forward-into-k3s.sh $SERVER:/tmp
 ssh $SERVER "chmod 700 /tmp/web-forward-into-k3s.sh && sudo /tmp/web-forward-into-k3s.sh"
 ```
 
-Next, create the ingress to the Tekton Dashboard.
+## Get ArgoCD Admin Password
 
-> [!IMPORTANT]
-> This is a deployment to a PRIVATE LAN with no Internet Ingress and therefore we create the ingress to the Tekton Dashboard. THIS IS NOT SECURE!  If you are not comfortable with this, or you have a different use-case that may involve multiple users on your LAN, skip this step.
+The admin password is available in the output of the tasks when you prefer to use the Tekton UI.
 
-> [!NOTE]
-> Ensure a DNS A record is created for the sub-domain `tekton` and that it points to the server's private IP address on the LAN.
+However, it is also easy and probably faster to just get the password from the terminal:
 
 ```bash
-# WARNING: Only apply if your are sure
-
-kubectl label namespace tekton-dashboard shared-gateway-access="true" --overwrite
-
-kubectl label namespace tekton-pipelines shared-gateway-access="true" --overwrite
-
-cat <<EOF > /tmp/k3s_route_tekton_dashboard.yaml
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: tekton-route
-  namespace: tekton-pipelines
-spec:
-  parentRefs:
-  - name: private-gateway
-    sectionName: http
-    namespace: nginx-gateway
-  - name: private-gateway
-    sectionName: https
-    namespace: nginx-gateway
-  hostnames:
-  - "tekton.${ROUTE_53_DOMAIN}"
-  rules:
-  - matches:
-    - path:
-        type: PathPrefix
-        value: /
-    backendRefs:
-    - name: tekton-dashboard
-      port: 9097
-EOF
-
-kubectl apply -f /tmp/k3s_route_tekton_dashboard.yaml
-
-open https://tekton.${ROUTE_53_DOMAIN}/
-```
-
-The Tekton Dashboard should now open with a trusted certificate.
-
-## Installing ArgoCD
-
-The installation can be handled by Tekton:
-
-```bash
-kubectl apply -f bootstrapping/k3s_local_dev/manifests/03_install_argocd.yaml
-```
-
-The ArgoCD `admin` password will be in the Task Run log which can be viewed in the Tekton dashboard.
-
-Alternatively, run the following:
-
-```bash
-kubectl logs pod/argocd-install-tr-pod -n development  | grep PASSWORD | awk '{print $2}'
-```
-
-> [!NOTE]
-> Ensure a DNS A record is created for `argocd` that resolves to the local LAN address of the server.
-
-> [!IMPORTANT]
-> I still need to resolve the issue with the Ingress configuration. I need to add trusted backend certificates in order to properly hookup the service. For now, only a local port-forward session is possible.
-
-```bash
-kubectl label namespace argocd shared-gateway-access="true" --overwrite
-
-cat <<EOF > /tmp/k3s_route_argocd.yaml
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: argocd-route
-  namespace: argocd
-spec:
-  parentRefs:
-  - name: private-gateway
-    sectionName: http
-    namespace: nginx-gateway
-  - name: private-gateway
-    sectionName: https
-    namespace: nginx-gateway
-  hostnames:
-  - "argocd.${ROUTE_53_DOMAIN}"
-  rules:
-  - matches:
-    - path:
-        type: PathPrefix
-        value: /
-    backendRefs:
-    - name: argocd-server
-      port: 80
-EOF
-
-kubectl apply -f /tmp/k3s_route_argocd.yaml
-
-open https://argocd.${ROUTE_53_DOMAIN}/
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
 ```
 
 <hr />
