@@ -110,7 +110,7 @@ spec:
       if [ -f "$FILE" ]; then
         $HELM repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
         $HELM repo update
-        $HELM install nfs nfs-subdir-external-provisioner/nfs-subdir-external-provisioner -f $(workspaces.shared-data.path)/nfs-values.yaml
+        $HELM install nfs nfs-subdir-external-provisioner/nfs-subdir-external-provisioner --create-namespace -n nfs -f $(workspaces.shared-data.path)/nfs-values.yaml
         echo "Sleeping 30 seconds to allow the StorageClass to be created..."
         sleep 30
       else
@@ -564,6 +564,56 @@ spec:
       echo "                    DONE"
       echo
       echo "----------------------------------------"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: kube-prometheus-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: install-helm
+    image: debian:bookworm
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      export HELM=$(workspaces.shared-data.path)/helm
+      if [ -f "$HELM" ]; then
+        echo "Helm Executable is available..."
+      else
+        apt update && apt install -y wget ca-certificates
+        update-ca-certificates
+        wget https://get.helm.sh/helm-v3.17.4-linux-amd64.tar.gz
+        tar xzf helm-v3.17.4-linux-amd64.tar.gz
+        mv -vf linux-amd64/helm $(workspaces.shared-data.path)/helm
+        echo "Helm installed"
+      fi
+      $HELM version
+      count=$($HELM version | grep version | wc -l)
+      if [ "$count" -eq 0 ]; then
+        echo "Error: Seems helm somehow failed to install" >&2
+        exit 1
+      fi
+  - name: install-kube-prometheus
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      export HELM=$(workspaces.shared-data.path)/helm
+      $HELM install kube-prometheus oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack --create-namespace -n kube-prometheus
+      echo "----------------------------------------"
+      echo
+      export ADMIN_PASSWORD=$(kubectl --namespace kube-prometheus get secrets kube-prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo)
+      echo "   PASSWORD: ${ADMIN_PASSWORD}"
+      echo
+      echo "----------------------------------------"
 
 ---
 apiVersion: tekton.dev/v1
@@ -674,6 +724,14 @@ spec:
     - run-deploy-primary-gateway
     taskRef:
       name: deploy-argocd
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-kube-prometheus-task
+    runAfter:
+    - run-deploy-argocd
+    taskRef:
+      name: kube-prometheus-task
     workspaces:
     - name: ws-env
     - name: shared-data

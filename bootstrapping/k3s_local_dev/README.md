@@ -123,7 +123,13 @@ export EMAIL=...
 # FORMAT: SET OF record_name,target_namespace,service_name,port
 # RECORD SET seprator is a colon (:)
 # 2x Record Set Example: export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80
-export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80
+# The default below is for ALL end-points:
+#   tekton
+#   argocd
+#   grafana
+#   prometheus
+#   alert-manager
+export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80:grafana,kube-prometheus,kube-prometheus-grafana,80:prometheus,kube-prometheus,kube-prometheus-kube-prome-prometheus,9090:alert-manager,kube-prometheus,kube-prometheus-kube-prome-alertmanager,9093
 EOF
 
 chmod 600 $HOME/.k3s_local_dev_env
@@ -357,6 +363,10 @@ However, it is also easy and probably faster to just get the password from the t
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
 ```
+
+## More References and Further Reading
+
+* [Tekton `TaskRun` Examples](https://github.com/tektoncd/pipeline/tree/release-v1.1.x/examples/v1/taskruns)
 
 <hr />
 
