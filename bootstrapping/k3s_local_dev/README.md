@@ -410,7 +410,7 @@ kubectl describe certificate/wildcard-toetzen-nl-certificate -n nginx-gateway
 #   Normal   Issuing    9m15s  cert-manager-certificates-trigger          Issuing certificate as Secret does not exist
 #   Normal   Generated  9m15s  cert-manager-certificates-key-manager      Stored new private key in temporary Secret resource "wildcard-toetzen-nl-certificate-v5cgv"
 #   Normal   Requested  9m15s  cert-manager-certificates-request-manager  Created new CertificateRequest resource "wildcard-toetzen-nl-certificate-1"
-#   Warning  Failed     9m9s   cert-manager-certificates-issuing          The certificate request has failed to complete and will be retried: Failed to wait for order resource "wildcard-toetzen-nl-certificate-1-2710018289" to become ready: order is in "errored" state: Failed to create Order: 429 urn:ietf:params:acme:error:rateLimited: too many certificates (5) already issued for this exact set of identifiers in the last 168h0m0s, retry after 2025-08-12 14:36:55 UTC: see https://letsencrypt.org/docs/rate-limits/#new-certificates-per-exact-set-of-identifiers
+#   Warning  Failed     9m9s   cert-manager-certificates-issuing          The certificate request has failed to complete and will be retried: Failed to wait for order resource "wildcard-example-tld-certificate-1-1111111111" to become ready: order is in "errored" state: Failed to create Order: 429 urn:ietf:params:acme:error:rateLimited: too many certificates (5) already issued for this exact set of identifiers in the last 168h0m0s, retry after 2025-08-12 14:36:55 UTC: see https://letsencrypt.org/docs/rate-limits/#new-certificates-per-exact-set-of-identifiers
 
 ```
 
