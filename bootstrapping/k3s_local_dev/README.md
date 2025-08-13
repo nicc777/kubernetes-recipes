@@ -14,12 +14,6 @@
 - [Approach](#approach)
 - [Preparation](#preparation)
 - [Installing K3s From Scratch](#installing-k3s-from-scratch)
-  * [Uninstall Any Previous K3s Installation](#uninstall-any-previous-k3s-installation)
-  * [Install a Fresh Cluster](#install-a-fresh-cluster)
-- [Install `Tekton`](#install-tekton)
-  * [Testing and Validating the Installation](#testing-and-validating-the-installation)
-  * [Preparing the Bootstrapping Pipelines / Tasks](#preparing-the-bootstrapping-pipelines--tasks)
-- [Run the Provisioning Pipeline](#run-the-provisioning-pipeline)
 - [Connectivity to the Cluster Gateway](#connectivity-to-the-cluster-gateway)
 - [Get ArgoCD Admin Password](#get-argocd-admin-password)
 - [Known Issues and/or Limitations](#known-issues-andor-limitations)
@@ -69,6 +63,9 @@ Some variations can be tollerated, notably that the target server and developer 
 | `kube-prometheus` | [home](https://prometheus-operator.dev/) and [GitHub](https://github.com/prometheus-operator/kube-prometheus) |
 | `BotKube` | [home](https://botkube.io/) and [documentation](https://docs.botkube.io/) |
 | `keptn` | [home](https://keptn.sh/stable/) and [documentation](https://keptn.sh/stable/docs/) and [GitHub](https://github.com/keptn/lifecycle-toolkit) |
+
+> [!NOTE]
+> For now, the `BotKube` and `keptn` installations is not included - may come at a later stage.
 
 ## Minimum Requirements
 
@@ -182,185 +179,12 @@ I like to run a clean version in my local environment for experiments. This appr
 * Keeping pace with new versions of key software elements and enables early identification of breaking changes that can be quickly fixed in pipelines, ensuring you always have the latest working configuration for a local development and testing environment.
 * Experiments are easily reproducible
 
-### Uninstall Any Previous K3s Installation
+A script is provided that now automates the entire bootstrap process.
 
-Only required if you have a current `k3s` cluster.
-
-Also refer to the [k3s documentation](https://docs.k3s.io/installation/uninstall) for the most up to date information.
-
-Command:
+Run it with the following command:
 
 ```bash
-ssh $SERVER /usr/local/bin/k3s-uninstall.sh
-```
-
-### Install a Fresh Cluster
-
-> [!NOTE]
-> First ensure the previous cluster is uninstalled - see previous section
-
-This specific installation will do the following:
-
-* Disable the default Ingress controller that ships with K3s (`Traefik`).
-* Force `NodePorts` to listen on the Host network enabling us to more easily configure port forwarding from the Host to the cluster ingress points.
-
-Commands:
-
-```bash
-cat <<EOF > /tmp/k3s_install.sh
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server" sh -s - --disable=traefik --kubelet-arg="node-ip=0.0.0.0"
-sudo cp -vf /etc/rancher/k3s/k3s.yaml /tmp/k3s.yaml
-sudo chown $USER:$USER /tmp/k3s.yaml
-EOF
-
-scp /tmp/k3s_install.sh $SERVER:/tmp/
-
-ssh $SERVER "chmod 700 /tmp/k3s_install.sh && sudo /tmp/k3s_install.sh"
-```
-
-On any other system you need the `KUBECONFIG`, run:
-
-```bash
-# [OPTIONAL] Only required if your Kubernetes cluster
-#            is not running on your local machine
-
-scp $SERVER:/tmp/k3s.yaml ~/
-
-sed -i "s/127.0.0.1/${SERVER}/g" $HOME/k3s.yaml
-```
-
-> [!NOTE]
-> Once the `k3s.yaml` is copied, you need to update the IP address of the server in the file
-
-Quick test:
-
-```bash
-kubectl get namespaces
-# Expected Output:
-# ----------------------------------------
-# default           Active   44s
-# kube-node-lease   Active   44s
-# kube-public       Active   44s
-# kube-system       Active   44s
-```
-
-## Install `Tekton`
-
-To install Tekton, run the following:
-
-```bash
-kubectl apply -f https://storage.googleapis.com/tekton-releases/operator/latest/release.yaml
-sleep 60 
-kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
-sleep 60
-kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
-sleep 60
-kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
-sleep 60
-kubectl apply --filename https://storage.googleapis.com/tekton-releases/dashboard/latest/release-full.yaml
-sleep 10
-```
-
-To test connectivity, temporarily setup a forwarding proxy:
-
-```bash
-kubectl port-forward service/tekton-dashboard --address 0.0.0.0 -n tekton-pipelines 9097:9097
-```
-
-And open a web browser from another terminal session:
-
-```bash
-open http://localhost:9097/
-
-```
-
-As a final step, also import the environment file as a secret for use by Tekton pipelines and tasks:
-
-```bash
-kubectl apply -f bootstrapping/k3s_local_dev/manifests/01_pipeline_administrative_clusterrole_for_tekton.yaml
-
-cp -vf $HOME/.k3s_local_dev_env /tmp/task_env
-
-sed -i "s/export //g" /tmp/task_env
-
-kubectl create secret generic env-secret --from-env-file=/tmp/task_env -n development
-
-kubectl create secret generic env-secret --from-env-file=/tmp/task_env -n bootstrapping
-```
-
-### Testing and Validating the Installation
-
-Apply the following two manifests:
-
-```bash
-kubectl apply -f bootstrapping/k3s_local_dev/manifests/02_test_taskrun.yaml
-```
-
-If you still have the web browser open on the Tekton dashboard, you should notice the following:
-
-![dashboard 01](./01_taskrun_expected_result.png)
-
-Another way to check is via the command line:
-
-```bash
-kubectl logs build-push-task-run-1-pod -n development
-# Expected Output:
-# ----------------------------------------
-# Defaulted container "step-get-namespaces" out of: step-get-namespaces, prepare (init), place-scripts (init)
-# Client Version: v1.33.3
-# Kustomize Version: v5.6.0
-# Server Version: v1.33.3+k3s1
-# NAME                         STATUS   AGE
-# default                      Active   4h44m
-# development                  Active   62m
-# kube-node-lease              Active   4h44m
-# kube-public                  Active   4h44m
-# kube-system                  Active   4h44m
-# tekton-dashboard             Active   121m
-# tekton-operator              Active   140m
-# tekton-pipelines             Active   140m
-# tekton-pipelines-resolvers   Active   127m
-```
-
-To cleanup the test:
-
-```bash
-# OPTIONAL...
-kubectl delete -f bootstrapping/k3s_local_dev/manifests/02_test_taskrun.yaml
-```
-
-### Preparing the Bootstrapping Pipelines / Tasks
-
-Next, we will prepare the bootstrapping namespace and resources to deploy the rest of the required services.
-
-Start by running the following:
-
-```bash
-kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/01_bootstrapping_rbac.yaml
-
-kubectl create secret generic env-secret --from-env-file=/tmp/task_env -n bootstrapping
-```
-
-## Run the Provisioning Pipeline
-
-The rest of the bootstrap process is handled by Tekton.
-
-You can open the Tekton Dashboard using the port-forwarder approach shown earlier. The DNS with the Gateway can be used after the bootstrap process is complete.
-
-Run the following:
-
-```bash
-kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/02_provision_k3s_local.yaml
-```
-
-Check the status and ensure the `SUCCEEDED` column has the value `True`:
-
-```bash
-kubectl get pipelineruns -n bootstrapping
-# Expected Output:
-# ----------------------------------------
-# NAME            SUCCEEDED   REASON      STARTTIME   COMPLETIONTIME
-# bootstrap-run   True        Succeeded   7m12s       4m48s
+bootstrapping/k3s_local_dev/01_k3s_clean_start.sh
 ```
 
 ## Connectivity to the Cluster Gateway

@@ -71,6 +71,65 @@ function validate_phase_1() {
   fi
 }
 
+function port_forward_message() {
+  echo
+  echo "----------------------------------------"
+  echo
+  echo "You can now add a port-forwarding session in order to open the Tekton Web UI:"
+  echo
+  echo "        kubectl port-forward service/tekton-dashboard --address 0.0.0.0 -n tekton-pipelines 9097:9097"
+  echo
+  echo "----------------------------------------"
+  echo
+}
+
+function deploy_tekton() {
+  kubectl apply -f https://storage.googleapis.com/tekton-releases/operator/latest/release.yaml
+  sleep 60
+  kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
+  sleep 60
+  kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
+  sleep 60
+  kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
+  sleep 60
+  kubectl apply --filename https://storage.googleapis.com/tekton-releases/dashboard/latest/release-full.yaml
+  sleep 10
+}
+
+function run_provisioning_pipeline() {
+
+  echo
+  echo "----------------------------------------"
+  echo
+  echo "Applying Primary Provisioning Pipeline..."
+  echo
+  echo "        NOTE: This could take 15 to 20 minutes."
+  echo
+  echo "        You can monitor the progress in Tekton."
+  echo
+  echo "----------------------------------------"
+  echo
+  kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/02_provision_k3s_local.yaml
+}
+
+function prep_for_main_deployment() {
+  cat <<EOF >/tmp/task_env
+SERVER=$SERVER
+LE_R53_KEY=$LE_R53_KEY
+LE_R53_SECRET=$LE_R53_SECRET
+ROUTE_53_ZONEID=$ROUTE_53_ZONEID
+ROUTE_53_DOMAIN=$ROUTE_53_DOMAIN
+ROUTE_53_RESOURCE_ID=$ROUTE_53_RESOURCE_ID
+KUBECONFIG=$KUBECONFIG
+NFS_SERVER=$NFS_SERVER
+NFS_PATH=$NFS_PATH
+EMAIL=$EMAIL
+ROUTES=$ROUTES
+EOF
+  kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/01_bootstrapping_rbac.yaml
+  kubectl create secret generic env-secret --from-env-file=/tmp/task_env -n bootstrapping
+}
+
 REQUIRED_VARS=("SERVER" "LE_R53_KEY" "LE_R53_SECRET" "ROUTE_53_ZONEID" "ROUTE_53_DOMAIN" "ROUTE_53_RESOURCE_ID" "KUBECONFIG" "NFS_SERVER" "NFS_PATH" "EMAIL" "ROUTES")
 
 # Loop through each variable name in the list
@@ -96,6 +155,10 @@ if "$answer"; then
   install_k3s
   get_kubernetes_config
   validate_phase_1
+  deploy_tekton
+  port_forward_message
+  prep_for_main_deployment
+  run_provisioning_pipeline
 else
   echo "Ok - not doing anything!"
 fi
