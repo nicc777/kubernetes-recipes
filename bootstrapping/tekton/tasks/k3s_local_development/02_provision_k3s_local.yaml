@@ -344,9 +344,9 @@ spec:
     script: |
       #!/usr/bin/env bash
       kubectl apply -f $(workspaces.shared-data.path)/k3s_certificates.yaml
-      echo "Waiting for certificate to be in a ready state... (maximum 10 minutes approx.)" 
+      echo "Waiting for certificate to be in a ready state... (maximum 15 minutes approx.)" 
       loop_count=0
-      MAX_ITERATIONS=60
+      MAX_ITERATIONS=90
       SUCCEEDED=0
       while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
         sleep 10
@@ -359,8 +359,14 @@ spec:
           loop_count=9999
         fi
       done
+      echo "----------------------------------------"
+      kubectl get certificates -n nginx-gateway
       if [ "$SUCCEEDED" -eq 0 ]; then
+        echo "----------------------------------------"
         kubectl get pods -n cert-manager
+        echo "----------------------------------------"
+        kubectl describe certificate/wildcard-toetzen-nl-certificate -n nginx-gateway
+        echo "----------------------------------------"
         echo "Error: Seems cert-manager somehow failed to install" >&2
         exit 1
       fi
@@ -484,11 +490,13 @@ spec:
     script: |
       #!/usr/bin/env bash
       echo "Applying routes..."
+      sleep 3
       export DOMAIN=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_DOMAIN)
       export ROUTES=$(head -n 1 $(workspaces.ws-env.path)/ROUTES)
       OLD_IFS=$IFS
       IFS=":"
       for ROUTE in $ROUTES; do
+        echo "----------------------------------------"
         echo "Processing Data:  ${ROUTE}"
         IFS=','
         read -r RECORD NAMESPACE SERVICE_NAME PORT <<< "$ROUTE"
@@ -497,17 +505,51 @@ spec:
         echo "   namespace    : ${NAMESPACE}"
         echo "   service name : ${SERVICE_NAME}"
         echo "   port         : ${PORT}"
+        echo 
         TARGET_HOSTNAME="${RECORD}.${DOMAIN}"
+        echo "Tagging namesapce ${NAMESPACE}"
+
+        loop_count=0
+        MAX_ITERATIONS=7
+        SUCCEEDED=0
+        while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
+          sleep 10
+          ((loop_count++))
+          echo "Validation iteration #${loop_count}..."
+          # Does the name space exist?
+          t=$(kubectl get namespaces | grep -v NAME | grep "${NAMESPACE}")
+          echo "   command output: ${t}"
+          echo
+          count=$(kubectl get namespaces | grep -v NAME | grep "${NAMESPACE}" | wc -l)
+          echo "   count value=${count}"
+          if [ "$count" -eq 1 ]; then
+            SUCCEEDED=1
+            loop_count=9999
+          fi
+        done
+        if [ "$SUCCEEDED" -eq 0 ]; then
+          kubectl get namespaces
+          echo "Error: Seems namespace ${NAMESPACE} does not exist yet" >&2
+          exit 1
+        fi
+
         kubectl label namespace $NAMESPACE shared-gateway-access="true" --overwrite
+        echo
+        echo "Preparing Template"
         cp -vf $(workspaces.shared-data.path)/route.yaml $(workspaces.shared-data.path)/route-working.yaml
         sed -i "s/__ROUTE_NAME__/${ROUTE_NAME}/g"  $(workspaces.shared-data.path)/route-working.yaml
         sed -i "s/__NAMESPACE__/${NAMESPACE}/g"  $(workspaces.shared-data.path)/route-working.yaml
         sed -i "s/__TARGET_HOSTNAME__/${TARGET_HOSTNAME}/g"  $(workspaces.shared-data.path)/route-working.yaml
         sed -i "s/__SERVICE_NAME__/${SERVICE_NAME}/g"  $(workspaces.shared-data.path)/route-working.yaml
         sed -i "s/__PORT__/${PORT}/g"  $(workspaces.shared-data.path)/route-working.yaml
-        echo "----------------------------------------"
+        echo "--- TEMPLATE ---"
         cat $(workspaces.shared-data.path)/route-working.yaml
+        echo "--- /TEMPLATE ---"
+        echo
+        echo "Deleting any previous routes"
         kubectl delete HTTPRoute/$ROUTE_NAME -n $NAMESPACE || true
+        echo
+        echo "Creating route"
         sleep 3
         kubectl apply -f $(workspaces.shared-data.path)/route-working.yaml
       done

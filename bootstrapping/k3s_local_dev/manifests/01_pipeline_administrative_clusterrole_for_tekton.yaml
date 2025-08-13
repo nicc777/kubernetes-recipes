@@ -7,6 +7,13 @@ metadata:
     name: development
 ---
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: bootstrapping
+  labels:
+    name: bootstrapping
+---
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: tekton-cluster-admin-sa

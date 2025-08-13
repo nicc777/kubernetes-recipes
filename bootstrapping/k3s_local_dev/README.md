@@ -1,9 +1,33 @@
-
 [main index](../../README.md) | [bootstrap menu](../README.md)
 
 <hr />
 
 # Bootstrapping K3s on a Single Host on a Private LAN
+
+<!-- toc -->
+
+  * [Basic Setup](#basic-setup)
+- [Component Project Pages and Further Information](#component-project-pages-and-further-information)
+- [Minimum Requirements](#minimum-requirements)
+  * [Pre-installed Software Required](#pre-installed-software-required)
+  * [Other software not technically required, but still useful](#other-software-not-technically-required-but-still-useful)
+- [Approach](#approach)
+- [Preparation](#preparation)
+- [Installing K3s From Scratch](#installing-k3s-from-scratch)
+  * [Uninstall Any Previous K3s Installation](#uninstall-any-previous-k3s-installation)
+  * [Install a Fresh Cluster](#install-a-fresh-cluster)
+- [Install `Tekton`](#install-tekton)
+  * [Testing and Validating the Installation](#testing-and-validating-the-installation)
+  * [Preparing the Bootstrapping Pipelines / Tasks](#preparing-the-bootstrapping-pipelines--tasks)
+- [Run the Provisioning Pipeline](#run-the-provisioning-pipeline)
+- [Connectivity to the Cluster Gateway](#connectivity-to-the-cluster-gateway)
+- [Get ArgoCD Admin Password](#get-argocd-admin-password)
+- [Known Issues and/or Limitations](#known-issues-andor-limitations)
+  * [Lets-Encrypt Limits](#lets-encrypt-limits)
+  * [Kube-Prometheus and the Gateway Routes](#kube-prometheus-and-the-gateway-routes)
+- [More References and Further Reading](#more-references-and-further-reading)
+
+<!-- tocstop -->
 
 > [!INFO]
 > The process still needs to be streamlined, and therefore the current documented process may appear more manual than _Infrastructure-as-Code_ for now.
@@ -260,6 +284,8 @@ cp -vf $HOME/.k3s_local_dev_env /tmp/task_env
 sed -i "s/export //g" /tmp/task_env
 
 kubectl create secret generic env-secret --from-env-file=/tmp/task_env -n development
+
+kubectl create secret generic env-secret --from-env-file=/tmp/task_env -n bootstrapping
 ```
 
 ### Testing and Validating the Installation
@@ -363,6 +389,36 @@ However, it is also easy and probably faster to just get the password from the t
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
 ```
+
+## Known Issues and/or Limitations
+
+### Lets-Encrypt Limits
+
+Lets-encrypt enforces a limit of "_5 certificates ... per exact same set of identifiers every 7 days_" ([reference](https://letsencrypt.org/docs/rate-limits/#new-certificates-per-exact-set-of-identifiers)). This is 1 certificate every 34 hours.
+
+As per the current configuration of the stack, the deployment should therefore not be done more than 5x times in a week.
+
+A typical error in the Kubernetes events may look like the following:
+
+```bash
+kubectl describe certificate/wildcard-toetzen-nl-certificate -n nginx-gateway
+# Example Events Section:
+# -----------------------
+# Events:
+#   Type     Reason     Age    From                                       Message
+#   ----     ------     ----   ----                                       -------
+#   Normal   Issuing    9m15s  cert-manager-certificates-trigger          Issuing certificate as Secret does not exist
+#   Normal   Generated  9m15s  cert-manager-certificates-key-manager      Stored new private key in temporary Secret resource "wildcard-toetzen-nl-certificate-v5cgv"
+#   Normal   Requested  9m15s  cert-manager-certificates-request-manager  Created new CertificateRequest resource "wildcard-toetzen-nl-certificate-1"
+#   Warning  Failed     9m9s   cert-manager-certificates-issuing          The certificate request has failed to complete and will be retried: Failed to wait for order resource "wildcard-toetzen-nl-certificate-1-2710018289" to become ready: order is in "errored" state: Failed to create Order: 429 urn:ietf:params:acme:error:rateLimited: too many certificates (5) already issued for this exact set of identifiers in the last 168h0m0s, retry after 2025-08-12 14:36:55 UTC: see https://letsencrypt.org/docs/rate-limits/#new-certificates-per-exact-set-of-identifiers
+
+```
+
+Once the limit is reached, take note of the `retry after` hint.
+
+### Kube-Prometheus and the Gateway Routes
+
+As of 12 August 2025, the `Gateway` configuration option in the Helm chart was still marked as very "experimental" and should not considered be stable. As a result, the `HTTPRoute` objects is still created separately. This will hopefully soon change to the point where the Helm chart values can be set to provision the various routes.
 
 ## More References and Further Reading
 
