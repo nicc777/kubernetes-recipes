@@ -115,6 +115,7 @@ spec:
         sleep 30
       else
         echo "The NFS Storage class may already be installed. Skipping installation."
+        exit 0
       fi
       echo "Installation of the NFS StorageClass Completed"
   - name: validate-nfs-storageclass-is-available
@@ -368,8 +369,10 @@ spec:
         kubectl describe certificate/wildcard-toetzen-nl-certificate -n nginx-gateway
         echo "----------------------------------------"
         echo "Error: Seems cert-manager somehow failed to install" >&2
-        exit 1
+        rm -vf $(workspaces.shared-data.path)/certificate_installed || true
+        exit 0
       fi
+      touch $(workspaces.shared-data.path)/certificate_installed
 
 ---
 apiVersion: tekton.dev/v1
@@ -433,13 +436,20 @@ spec:
     image: bitnami/kubectl:latest
     script: |
       #!/usr/bin/env bash
-      kubectl apply -f $(workspaces.shared-data.path)/k3s_gateway.yaml
-      echo "----------------------------------------"
-      sleep 10  
-      kubectl get gateways -n nginx-gateway
-      echo "----------------------------------------"
-      sleep 10
-      kubectl describe gateway/private-gateway -n nginx-gateway
+      FILE=$(workspaces.shared-data.path)/certificate_installed
+      if [ -f "$FILE" ]; then
+        kubectl apply -f $(workspaces.shared-data.path)/k3s_gateway.yaml
+        echo "----------------------------------------"
+        sleep 10  
+        kubectl get gateways -n nginx-gateway
+        echo "----------------------------------------"
+        sleep 10
+        kubectl describe gateway/private-gateway -n nginx-gateway
+      else
+        echo "Because there was an issue with the certificate provisioning, the Gateway resources will not be installed."
+        exit 0
+      fi
+
 
 ---
 apiVersion: tekton.dev/v1
@@ -489,7 +499,14 @@ spec:
     image: bitnami/kubectl:latest
     script: |
       #!/usr/bin/env bash
-      echo "Applying routes..."
+      FILE=$(workspaces.shared-data.path)/certificate_installed
+      if [ -f "$FILE" ]; then
+        echo "Applying routes..."
+      else
+        echo "Because there was an issue with the certificate provisioning, the HTTPRoute resources will not be installed."
+        exit 0
+      fi
+
       sleep 3
       export DOMAIN=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_DOMAIN)
       export ROUTES=$(head -n 1 $(workspaces.ws-env.path)/ROUTES)
@@ -674,11 +691,28 @@ spec:
     image: bitnami/kubectl:latest
     script: |
       #!/usr/bin/env bash
+      echo "----------------------------------------"
       echo "Created Files:"
-      echo "-------------"
+      echo "----------------------------------------"
       echo
       ls -lahrt $(workspaces.shared-data.path)/*.yaml
       echo
+      echo "----------------------------------------"
+      echo "Namespaces:"
+      echo "----------------------------------------"
+      echo
+      kubectl get namespaces
+      echo
+      echo "----------------------------------------"
+      echo "Helm Charts Installed:"
+      echo "----------------------------------------"
+      echo
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      export HELM=$(workspaces.shared-data.path)/helm
+      $HELM list --all-namespaces
+      echo
+      echo "----------------------------------------"
       echo
       echo "DONE !!!"
 

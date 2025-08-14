@@ -19,6 +19,8 @@
 - [Known Issues and/or Limitations](#known-issues-andor-limitations)
   * [Lets-Encrypt Limits](#lets-encrypt-limits)
   * [Kube-Prometheus and the Gateway Routes](#kube-prometheus-and-the-gateway-routes)
+  * [Gitea DB Persistence](#gitea-db-persistence)
+  * [Gitea SSH Access](#gitea-ssh-access)
 - [More References and Further Reading](#more-references-and-further-reading)
 
 <!-- tocstop -->
@@ -59,7 +61,7 @@ Some variations can be tollerated, notably that the target server and developer 
 | `Nginx` Gateway Fabrix | [documentation](https://docs.nginx.com/nginx-gateway-fabric/) and [GitHub](https://github.com/nginx/nginx-gateway-fabric) |
 | `ArgoCD` | [home](https://argoproj.github.io/cd/) and [documentation](https://argo-cd.readthedocs.io/en/stable/) and [GitHub](https://github.com/argoproj/argo-cd) |
 | `Tekton` | [home](https://tekton.dev/) and [documentation](https://tekton.dev/docs/) and [GitHub Repository Index](https://github.com/tektoncd) and [Operator Installation Instruction](https://github.com/tektoncd/operator/blob/main/docs/install.md) |
-| `Gitea` | [home](https://about.gitea.com/) and [documentation](https://docs.gitea.com/) |
+| `Gitea` | [home](https://about.gitea.com/) and [Helm Documentation](https://gitea.com/gitea/helm-gitea) and [documentation](https://docs.gitea.com/) |
 | `kube-prometheus` | [home](https://prometheus-operator.dev/) and [GitHub](https://github.com/prometheus-operator/kube-prometheus) |
 | `BotKube` | [home](https://botkube.io/) and [documentation](https://docs.botkube.io/) |
 | `keptn` | [home](https://keptn.sh/stable/) and [documentation](https://keptn.sh/stable/docs/) and [GitHub](https://github.com/keptn/lifecycle-toolkit) |
@@ -150,7 +152,8 @@ export EMAIL=...
 #   grafana
 #   prometheus
 #   alert-manager
-export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80:grafana,kube-prometheus,kube-prometheus-grafana,80:prometheus,kube-prometheus,kube-prometheus-kube-prome-prometheus,9090:alert-manager,kube-prometheus,kube-prometheus-kube-prome-alertmanager,9093
+#   gitea
+export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80:grafana,kube-prometheus,kube-prometheus-grafana,80:prometheus,kube-prometheus,kube-prometheus-kube-prome-prometheus,9090:alert-manager,kube-prometheus,kube-prometheus-kube-prome-alertmanager,9093:gitea:devops:gitea-http:3000
 EOF
 
 chmod 600 $HOME/.k3s_local_dev_env
@@ -240,9 +243,79 @@ kubectl describe certificate/wildcard-toetzen-nl-certificate -n nginx-gateway
 
 Once the limit is reached, take note of the `retry after` hint.
 
+> [!IMPORTANT]
+> If the certificate creation fails, the pipeline will continue, but will skip installing `Gateway`, `HTTPRoute` and related resources dependant on the certificates. I did this of personal preference, as I value working with minimal interruption more than just not being able to proceed because a cluster cannot be provisioned. It is slightly more inconvenient, but definitely not a show stopper and after a fresh run of the installation after a couple of days the problem should go away anyway.
+
 ### Kube-Prometheus and the Gateway Routes
 
 As of 12 August 2025, the `Gateway` configuration option in the Helm chart was still marked as very "experimental" and should not considered be stable. As a result, the `HTTPRoute` objects is still created separately. This will hopefully soon change to the point where the Helm chart values can be set to provision the various routes.
+
+### Gitea DB Persistence
+
+There is currently no option to set the persistent volume for the built-in database options (`postgres-ha` and`postgres`).
+
+In the near future I would likely update this stack to include a stand-alone database with persistence.
+
+I also need to create `PersistentVolume` objects in order to re-use the previous the same volumes every time the cluster is re-created.
+
+An example manifest (just as reference for later):
+
+```yaml
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-pv-existing-data
+spec:
+  capacity:
+    storage: 10Gi # This should match the size of your existing data directory
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany # Adjust this to match your use case
+  persistentVolumeReclaimPolicy: Retain # IMPORTANT: This prevents data loss on PV deletion
+  storageClassName: manual
+  nfs:
+    path: /path/to/nfs/share/long-random-name # <--- SET THIS TO YOUR EXISTING DIRECTORY
+    server: 192.168.1.100                    # <--- SET THIS TO YOUR NFS SERVER IP/HOSTNAME
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-pvc-for-existing-data
+spec:
+  accessModes:
+    - ReadWriteMany # Must match the PV
+  storageClassName: manual # Must match the PV
+  resources:
+    requests:
+      storage: 10Gi # Must match the PV
+```
+
+### Gitea SSH Access
+
+The `TLSRoute` implementation is not yet stable, and therefore any SSH access to Gitea would require a port-forwarding session.
+
+Example:
+
+```bash
+kubectl port-forward service/gitea-ssh --address 0.0.0.0 -n devops 9022:22
+```
+
+Then, in your `~/.ssh/config` you can add the following:
+
+```text
+Host gitea-k3s
+    HostName localhost
+    Port 9022
+    IdentityFile /home/your-username/.ssh/your-private-key
+    IdentitiesOnly yes
+```
+
+And then, to clone a repository, you would run something like this:
+
+```bash
+git clone git@gitea-k3s:username/project-name.git
+```
 
 ## More References and Further Reading
 

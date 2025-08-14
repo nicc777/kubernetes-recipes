@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: x
+  name: gitea-task
   namespace: bootstrapping
 spec:
   workspaces:
@@ -11,11 +11,122 @@ spec:
   - name: ws-env
     mountPath: /data/.env
   steps:
-  - name: x
-    image: debian:bookworm
+  - name: prepare-values
+    image: bitnami/kubectl:latest
     script: |
       #!/usr/bin/env bash
+      echo "See https://gitea.com/gitea/helm-gitea for details..."
+      cat <<EOF > $(workspaces.shared-data.path)/gitea_volumes.yaml
+      ---
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: nfs-gitea-claim
+        namespace: devops
+      spec:
+        accessModes:
+        - ReadWriteMany
+        storageClassName: nfs-client
+        resources:
+          requests:
+            storage: 10Gi
+      ---
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: nfs-gitea-db-claim
+        namespace: devops
+      spec:
+        accessModes:
+        - ReadWriteMany
+        storageClassName: nfs-client
+        resources:
+          requests:
+            storage: 10Gi
+      EOF
 
+      cat <<EOF > $(workspaces.shared-data.path)/gitea_values.yaml
+      namespace: devops
+      ingress:
+        enabled: false
+      persistence:
+        create: false
+        claimName: nfs-gitea-claim
+        subPath: gitea_k3s_localdev
+      gitea:
+        admin:
+          username: admin
+          password: password
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+      valkey-cluster:
+        enabled: false
+      valkey:
+        enabled: true
+      postgresql-ha:
+        enabled: false
+      postgresql:
+        enabled: true
+      EOF
+  - name: install-gitea-helm-chart
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      export HELM=$(workspaces.shared-data.path)/helm
+      $HELM uninstall -n devops gitea || true
+      kubectl delete namespace devops
+      sleep 3
+      kubectl create namespace devops || true
+      kubectl apply -f $(workspaces.shared-data.path)/gitea_volumes.yaml
+      sleep 3
+      $HELM install gitea oci://registry-1.docker.io/giteacharts/gitea -n devops -f $(workspaces.shared-data.path)/gitea_values.yaml
+
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: end-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: print-done-message
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "----------------------------------------"
+      echo "Created Files:"
+      echo "----------------------------------------"
+      echo
+      ls -lahrt $(workspaces.shared-data.path)/*.yaml
+      echo
+      echo "----------------------------------------"
+      echo "Namespaces:"
+      echo "----------------------------------------"
+      echo
+      kubectl get namespaces
+      echo
+      echo "----------------------------------------"
+      echo "Helm Charts Installed:"
+      echo "----------------------------------------"
+      echo
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      export HELM=$(workspaces.shared-data.path)/helm
+      $HELM list --all-namespaces
+      echo
+      echo "----------------------------------------"
+      echo
+      echo "DONE !!!"
 ---
 apiVersion: tekton.dev/v1
 kind: Pipeline
@@ -27,9 +138,17 @@ spec:
   - name: ws-env
   - name: shared-data
   tasks:
-  - name: run-x
+  - name: run-gitea-task
     taskRef:
-      name: x
+      name: gitea-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-end-task
+    runAfter:
+    - run-gitea-task
+    taskRef:
+      name: end-task
     workspaces:
     - name: ws-env
     - name: shared-data
