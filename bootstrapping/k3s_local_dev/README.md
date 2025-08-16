@@ -21,6 +21,8 @@
   * [Kube-Prometheus and the Gateway Routes](#kube-prometheus-and-the-gateway-routes)
   * [Gitea DB Persistence](#gitea-db-persistence)
   * [Gitea SSH Access](#gitea-ssh-access)
+    + [Example Port Forwarder for SSH](#example-port-forwarder-for-ssh)
+    + [Example Using `socat`](#example-using-socat)
 - [More References and Further Reading](#more-references-and-further-reading)
 
 <!-- tocstop -->
@@ -152,8 +154,9 @@ export EMAIL=...
 #   grafana
 #   prometheus
 #   alert-manager
-#   gitea
-export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80:grafana,kube-prometheus,kube-prometheus-grafana,80:prometheus,kube-prometheus,kube-prometheus-kube-prome-prometheus,9090:alert-manager,kube-prometheus,kube-prometheus-kube-prome-alertmanager,9093:gitea:devops:gitea-http:3000
+#   gitea-k3s
+#   giea-k3s-pgadmin
+export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80:grafana,kube-prometheus,kube-prometheus-grafana,80:prometheus,kube-prometheus,kube-prometheus-kube-prome-prometheus,9090:alert-manager,kube-prometheus,kube-prometheus-kube-prome-alertmanager,9093:gitea:devops:gitea-http:3000:gitea-k3s,devops,gitea-http,3000:gitea-k3s-pgadmin,devops,pgadmin-service,80
 EOF
 
 chmod 600 $HOME/.k3s_local_dev_env
@@ -198,8 +201,8 @@ If you have not already done so before, also add the `socat` rule to forward all
 cat <<EOF > /tmp/web-forward-into-k3s.sh
 #!/usr/bin/env bash
 
-nohup socat tcp-listen:80,fork tcp:192.168.2.13:30080 &
-nohup socat tcp-listen:443,fork tcp:192.168.2.13:30443 &
+nohup socat tcp-listen:80,fork tcp:${SERVER}:30080 &
+nohup socat tcp-listen:443,fork tcp:${SERVER}:30443 &
 EOF
 
 scp /tmp/web-forward-into-k3s.sh $SERVER:/tmp
@@ -254,46 +257,17 @@ As of 12 August 2025, the `Gateway` configuration option in the Helm chart was s
 
 There is currently no option to set the persistent volume for the built-in database options (`postgres-ha` and`postgres`).
 
-In the near future I would likely update this stack to include a stand-alone database with persistence.
+As a result, a standalone PostgreSQL server is deployed with a persisted volume. The NFS server is used to persis data - if something else is needed, the Tekton provisioning task needs to be updated accordingly.
 
-I also need to create `PersistentVolume` objects in order to re-use the previous the same volumes every time the cluster is re-created.
-
-An example manifest (just as reference for later):
-
-```yaml
----
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: nfs-pv-existing-data
-spec:
-  capacity:
-    storage: 10Gi # This should match the size of your existing data directory
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteMany # Adjust this to match your use case
-  persistentVolumeReclaimPolicy: Retain # IMPORTANT: This prevents data loss on PV deletion
-  storageClassName: manual
-  nfs:
-    path: /path/to/nfs/share/long-random-name # <--- SET THIS TO YOUR EXISTING DIRECTORY
-    server: 192.168.1.100                    # <--- SET THIS TO YOUR NFS SERVER IP/HOSTNAME
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: my-pvc-for-existing-data
-spec:
-  accessModes:
-    - ReadWriteMany # Must match the PV
-  storageClassName: manual # Must match the PV
-  resources:
-    requests:
-      storage: 10Gi # Must match the PV
-```
+Along with the database server, an instance of PGAdmin is also installed, already pre-configured with the Gitea database settings.
 
 ### Gitea SSH Access
 
 The `TLSRoute` implementation is not yet stable, and therefore any SSH access to Gitea would require a port-forwarding session.
+
+The deployment uses a `NodePort`, and therefore a `socat` rule could also be used, if so preferred.
+
+#### Example Port Forwarder for SSH
 
 Example:
 
@@ -307,6 +281,38 @@ Then, in your `~/.ssh/config` you can add the following:
 Host gitea-k3s
     HostName localhost
     Port 9022
+    IdentityFile /home/your-username/.ssh/your-private-key
+    IdentitiesOnly yes
+```
+
+And then, to clone a repository, you would run something like this:
+
+```bash
+git clone git@gitea-k3s:username/project-name.git
+```
+
+#### Example Using `socat`
+
+Run the following to set-up the SSH forwarding using `socat`:
+
+```bash
+cat <<EOF > /tmp/ssh-forward-into-k3s-gitea.sh
+#!/usr/bin/env bash
+
+nohup socat tcp-listen:2222,fork tcp:${SERVER}:30022 &
+EOF
+
+scp /tmp/ssh-forward-into-k3s-gitea.sh $SERVER:/tmp
+
+ssh $SERVER "chmod 700 /tmp/ssh-forward-into-k3s-gitea.sh && sudo /tmp/ssh-forward-into-k3s-gitea.sh"
+```
+
+Then, in your `~/.ssh/config` you can add the following:
+
+```text
+Host gitea-k3s
+    HostName gitea-k3s
+    Port 30022
     IdentityFile /home/your-username/.ssh/your-private-key
     IdentitiesOnly yes
 ```
