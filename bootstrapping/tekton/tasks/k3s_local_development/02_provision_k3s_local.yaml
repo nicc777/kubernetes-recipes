@@ -537,9 +537,9 @@ spec:
           t=$(kubectl get namespaces | grep -v NAME | grep "${NAMESPACE}")
           echo "   command output: ${t}"
           echo
-          count=$(kubectl get namespaces | grep -v NAME | grep "${NAMESPACE}" | wc -l)
+          count=$(kubectl get namespaces | grep -v NAME | grep -w "${NAMESPACE}" | wc -l)
           echo "   count value=${count}"
-          if [ "$count" -eq 1 ]; then
+          if [ "$count" -gt 0 ]; then
             SUCCEEDED=1
             loop_count=9999
           fi
@@ -750,7 +750,7 @@ spec:
         storageClassName: nfs-gitea-db
         nfs:
           The following directory needs to exist on NFS:
-          path: ${NFS_PATH}/gitea-sb
+          path: ${NFS_PATH}/gitea-db
           server: ${NFS_SERVER}
       ---
       apiVersion: v1
