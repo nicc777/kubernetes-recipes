@@ -1154,7 +1154,7 @@ spec:
   # REMEMBER to update the below task dependency once all tasks have been defined...
   - name: run-create-gateway-routes
     runAfter:
-    - run-deploy-argocd
+    - run-gitea-task
     taskRef:
       name: create-gateway-routes
     workspaces:
