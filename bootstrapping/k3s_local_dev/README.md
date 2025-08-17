@@ -144,6 +144,10 @@ export NFS_PATH=...
 # Other
 export EMAIL=...
 
+# LetsEncrypt Certificate Issuer URL to Use - Pick one of the two:
+export ISSUER_URL="https://acme-v02.api.letsencrypt.org/directory"
+#export ISSUER_URL="https://acme-staging-v02.api.letsencrypt.org/directory"
+
 # DNS Record names to create routes for - comma separated list:
 # FORMAT: SET OF record_name,target_namespace,service_name,port
 # RECORD SET seprator is a colon (:)
@@ -248,6 +252,9 @@ Once the limit is reached, take note of the `retry after` hint.
 
 > [!IMPORTANT]
 > If the certificate creation fails, the pipeline will continue, but will skip installing `Gateway`, `HTTPRoute` and related resources dependant on the certificates. I did this of personal preference, as I value working with minimal interruption more than just not being able to proceed because a cluster cannot be provisioned. It is slightly more inconvenient, but definitely not a show stopper and after a fresh run of the installation after a couple of days the problem should go away anyway.
+
+> [!NOTE]
+> Another option is to change the `ISSUER_URL` to the staging URL in the environment variables.
 
 ### Kube-Prometheus and the Gateway Routes
 

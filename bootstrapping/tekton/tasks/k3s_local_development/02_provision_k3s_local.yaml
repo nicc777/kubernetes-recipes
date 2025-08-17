@@ -288,6 +288,7 @@ spec:
       export EMAIL=$(head -1 $(workspaces.ws-env.path)/EMAIL)
       export DNS_NAME_1=$DOMAIN
       export DNS_NAME_2="*.${DOMAIN}"
+      export ISSUER_URL=$(head -1 $(workspaces.ws-env.path)/ISSUER_URL)
       cat <<EOF > $(workspaces.shared-data.path)/k3s_certificates.yaml
       ---
       apiVersion: v1
@@ -308,7 +309,7 @@ spec:
       spec:
         acme:
           email: $EMAIL
-          server: https://acme-v02.api.letsencrypt.org/directory
+          server: $ISSUER_URL
           privateKeySecretRef:
             name: $ISSUER_ACCOUNT_KEY_NAME
           solvers:
