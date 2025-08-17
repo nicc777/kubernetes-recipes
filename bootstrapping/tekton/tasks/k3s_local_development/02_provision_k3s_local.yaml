@@ -1162,7 +1162,7 @@ spec:
     - name: shared-data
   - name: run-end-task
     runAfter:
-    - run-deploy-primary-gateway
+    - run-create-gateway-routes
     taskRef:
       name: end-task
     workspaces:
