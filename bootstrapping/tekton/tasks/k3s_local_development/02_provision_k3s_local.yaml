@@ -371,6 +371,10 @@ spec:
         echo "----------------------------------------"
         echo "Error: Seems cert-manager somehow failed to install" >&2
         rm -vf $(workspaces.shared-data.path)/certificate_installed || true
+        echo "----------------------------------------"
+        echo "Manifest Content"
+        echo "----------------------------------------"
+        cat $(workspaces.shared-data.path)/k3s_certificates.yaml
         exit 0
       fi
       touch $(workspaces.shared-data.path)/certificate_installed

@@ -124,6 +124,7 @@ KUBECONFIG=$KUBECONFIG
 NFS_SERVER=$NFS_SERVER
 NFS_PATH=$NFS_PATH
 EMAIL=$EMAIL
+ISSUER_URL=$ISSUER_URL
 ROUTES=$ROUTES
 EOF
   kubectl apply -f bootstrapping/tekton/tasks/k3s_local_development/01_bootstrapping_rbac.yaml
