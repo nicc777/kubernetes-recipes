@@ -78,7 +78,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./admission_webhooks/src
-          file: Containerfile.validation_hook
+          file: ./admission_webhooks/src/Containerfile.validation_hook
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
