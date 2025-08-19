@@ -7,5 +7,30 @@ COPY ./requirements.txt /code/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 COPY ./validation_hook /code/app
+COPY ./launcher.sh /code/launcher.sh
+RUN chmod 700 /code/launcher.sh
 
-CMD ["fastapi", "run", "app/validation_hook.py", "--port", "80"]
+# To enable debug logging, set to 1
+ENV DEBUG 0
+
+# To disable HTTPS, set the following to 0 
+ENV USE_TLS 1
+
+# Overrides for the certificates
+ENV SSL_KEY_FILE /certs/tls.key
+ENV SSL_CERTIFICATE_FILE /certs/tls.crt
+
+# Service settings:
+ENV HOST 0.0.0.0
+ENV PORT 8443
+ENV WORKERS 4
+
+# The vollowing is the Python file name (without the extension) - You should NOT have to change this - its merely a hlper for the generic launcher shell script
+ENV APP_FILE validation_hook
+
+# CMD ["fastapi", "run", "app/validation_hook.py", "--port", "80"]
+#
+# We need to use uvicorn as we need to terminate on TLS
+#WORKDIR /code/app
+#CMD ["uvicorn", "validation_hook:app", "--host", "0.0.0.0", "--port", "8443", "--workers", "4", "--ssl-keyfile=/certs/tls.key", "--ssl-certfile=/certs/tls.crt" ]
+CMD ["/code/launcher.sh"]
