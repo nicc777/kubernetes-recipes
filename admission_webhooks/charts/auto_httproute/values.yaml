@@ -82,11 +82,17 @@ resources:
 livenessProbe:
   httpGet:
     path: /
-    port: http
+    port: 8443
+  initialDelaySeconds: 3
+  periodSeconds: 30
+  failureThreshold: 30
 readinessProbe:
   httpGet:
     path: /
-    port: http
+    port: 8443
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  failureThreshold: 3
 
 tlsVolumeMounts:
   volumeMounts:
