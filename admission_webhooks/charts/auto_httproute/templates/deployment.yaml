@@ -5,7 +5,7 @@ metadata:
   name: {{ .Chart.Name }}-validating-webhook
   namespace: {{ .Values.namespace }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       app: {{ .Chart.Name }}-validating-webhook
@@ -14,7 +14,6 @@ spec:
       labels:
         app: {{ .Chart.Name }}-validating-webhook
     spec:
-      replicas: {{ .Values.replicaCount }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -80,7 +79,7 @@ metadata:
   name: {{ .Chart.Name }}-mutating-webhook
   namespace: {{ .Values.namespace }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       app: {{ .Chart.Name }}-mutating-webhook
@@ -89,7 +88,6 @@ spec:
       labels:
         app: {{ .Chart.Name }}-mutating-webhook
     spec:
-      replicas: {{ .Values.replicaCount }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
