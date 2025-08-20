@@ -19,8 +19,10 @@ spec:
     kind: Issuer
   commonName: webhook.{{ .Values.namespace }}.svc
   dnsNames:
-    - webhook.{{ .Values.namespace }}.svc
-    - webhook.{{ .Values.namespace }}.svc.cluster.local
+    - validating-webhook.{{ .Values.namespace }}.svc
+    - validating-webhook.{{ .Values.namespace }}.svc.cluster.local
+    - mutating-webhook.{{ .Values.namespace }}.svc
+    - mutating-webhook.{{ .Values.namespace }}.svc.cluster.local
   usages:
     - server auth
 

@@ -1,9 +1,9 @@
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "auto_httproute.fullname" . }}
-  labels:
-    {{- include "auto_httproute.labels" . | nindent 4 }}
+  name: validating-webhook
+  namespace: {{ .Values.namespace }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -12,4 +12,19 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "auto_httproute.selectorLabels" . | nindent 4 }}
+    app: validating-webhook
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mutating-webhook
+  namespace: {{ .Values.namespace }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: mutating-webhook
