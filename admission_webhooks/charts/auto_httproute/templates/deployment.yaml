@@ -47,12 +47,12 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{ if eq .Values.service.tlsEnabled "1" }}
+          {{- if gt .Values.service.tlsEnabled 0 }}
           volumeMounts:
           - name: tls
             mountPath: /certs
             readOnly: true
-          {{ end }}
+          {{- end }}
           env:
           {{- with .Values.service }}
           - name: SSL_CERTIFICATE_FILE
@@ -134,12 +134,12 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{ if eq .Values.service.tlsEnabled "1" }}
+          {{- if gt .Values.service.tlsEnabled 0 }}
           volumeMounts:
           - name: tls
             mountPath: /certs
             readOnly: true
-          {{ end }}
+          {{- end }}
           env:
           {{- with .Values.service }}
           - name: SSL_CERTIFICATE_FILE

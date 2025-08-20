@@ -48,7 +48,7 @@ service:
   type: ClusterIP
   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
   port: 8443
-  tlsEnabled: "1"
+  tlsEnabled: 1
   tlsKeyFile: /certs/tls.key
   tlsCertificateFile: /certs/tls.crt
   workers: "4"

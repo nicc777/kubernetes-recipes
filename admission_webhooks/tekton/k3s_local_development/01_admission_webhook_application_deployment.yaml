@@ -34,7 +34,7 @@ spec:
           helm:
             valuesObject:
               service:
-                tlsEnabled: "0"
+                tlsEnabled: 0
               image:
                 validationWebhook:
                   tag: validation-webhook-r0.5
