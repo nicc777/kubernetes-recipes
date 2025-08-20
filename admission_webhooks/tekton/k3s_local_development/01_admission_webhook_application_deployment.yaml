@@ -45,7 +45,7 @@ spec:
             value: 'https://github.com/nicc777/kubernetes-recipes'
         syncPolicy:
           automated:
-            enable: true
+            # enable: true
             prune: true
             selfHeal: true
             allowEmpty: false
@@ -84,6 +84,7 @@ spec:
       echo
       echo $CA_BUNDLE
       echo "----------------------------------------"
+
 
 ---
 apiVersion: tekton.dev/v1
@@ -125,22 +126,22 @@ metadata:
   namespace: bootstrapping
 spec:
   workspaces:
-  - name: ws-env
+  # - name: ws-env
   - name: shared-data
   tasks:
-  - name: run-fix-task
+  - name: run-admission-webhook-task
     taskRef:
       name: admission-webhook-task
     workspaces:
-    - name: ws-env
+    # - name: ws-env
     - name: shared-data
   - name: run-end-task
     runAfter:
-    - run-fix-task
+    - run-admission-webhook-task
     taskRef:
       name: end-task
     workspaces:
-    - name: ws-env
+    # - name: ws-env
     - name: shared-data
 ---
 #apiVersion: tekton.dev/v1
