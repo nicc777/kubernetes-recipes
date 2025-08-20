@@ -48,7 +48,7 @@ service:
   type: ClusterIP
   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
   port: 8443
-  tlsEnabled: 1
+  tlsEnabled: 0
   tlsKeyFile: /certs/tls.key
   tlsCertificateFile: /certs/tls.crt
   workers: "4"
@@ -71,10 +71,6 @@ ingress:
   #      - chart-example.local
 
 resources:
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
   limits:
     cpu: 100m
     memory: 128Mi
@@ -92,6 +88,17 @@ readinessProbe:
     path: /
     port: http
 
+tlsVolumeMounts:
+  volumeMounts:
+    - name: tls
+      mountPath: /certs
+      readOnly: true
+
+tlsVolumes:
+  volumes:
+  - name: tls
+    secret:
+      secretName: webhook-tls
 
 nodeSelector: {}
 

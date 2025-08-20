@@ -48,10 +48,9 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- if gt ( int .Values.service.tlsEnabled ) 0 }}
-          volumeMounts:
-          - name: tls
-            mountPath: /certs
-            readOnly: true
+            {{- with .Values.tlsVolumeMounts }}
+              {{- toYaml . | nindent 10 }}
+            {{- end }}
           {{- end }}
           env:
           {{- with .Values.service }}
@@ -59,7 +58,7 @@ spec:
             value: {{ .tlsCertificateFile }}
           - name: SSL_KEY_FILE
             value: {{ .tlsKeyFile }}
-          - name: USE_TL
+          - name: USE_TLS
             value: {{ .tlsEnabled | quote }}
           {{- end }}
           - name: HOST
@@ -68,22 +67,11 @@ spec:
             value: {{ .Values.service.port | quote }}
           - name: WORKERS
             value: {{ .Values.service.workers | quote }}
-      {{ if gt ( int .Values.service.tlsEnabled ) 0 }}
-      volumes:
-      - name: tls
-        secret:
-          secretName: webhook-tls
-      {{ end }}
-      # nodeSelector:
-      #   {{- toYaml . | nindent 8 }}
-      # {{- with .Values.affinity }}
-      # affinity:
-      #   {{- toYaml . | nindent 8 }}
-      # {{- end }}
-      # {{- with .Values.tolerations }}
-      # tolerations:
-      #   {{- toYaml . | nindent 8 }}
-      # {{- end }}
+      {{- if gt ( int .Values.service.tlsEnabled ) 0 }}
+        {{- with .Values.tlsVolumes }}
+          {{- toYaml . | nindent 6 }}
+        {{- end }}
+      {{- end }}
 
 ---
 apiVersion: apps/v1
@@ -135,10 +123,9 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- if gt ( int .Values.service.tlsEnabled ) 0 }}
-          volumeMounts:
-          - name: tls
-            mountPath: /certs
-            readOnly: true
+            {{- with .Values.tlsVolumeMounts }}
+              {{- toYaml . | nindent 10 }}
+            {{- end }}
           {{- end }}
           env:
           {{- with .Values.service }}
@@ -146,7 +133,7 @@ spec:
             value: {{ .tlsCertificateFile }}
           - name: SSL_KEY_FILE
             value: {{ .tlsKeyFile }}
-          - name: USE_TL
+          - name: USE_TLS
             value: {{ .tlsEnabled | quote }}
           {{- end }}
           - name: HOST
@@ -155,19 +142,8 @@ spec:
             value: {{ .Values.service.port | quote }}
           - name: WORKERS
             value: {{ .Values.service.workers | quote }}
-      {{ if gt ( int .Values.service.tlsEnabled ) 0 }}
-      volumes:
-      - name: tls
-        secret:
-          secretName: webhook-tls
-      {{ end }}
-      # nodeSelector:
-      #   {{- toYaml . | nindent 8 }}
-      # {{- with .Values.affinity }}
-      # affinity:
-      #   {{- toYaml . | nindent 8 }}
-      # {{- end }}
-      # {{- with .Values.tolerations }}
-      # tolerations:
-      #   {{- toYaml . | nindent 8 }}
-      # {{- end }}
+      {{- if gt ( int .Values.service.tlsEnabled ) 0 }}
+        {{- with .Values.tlsVolumes }}
+          {{- toYaml . | nindent 6 }}
+        {{- end }}
+      {{- end }}
