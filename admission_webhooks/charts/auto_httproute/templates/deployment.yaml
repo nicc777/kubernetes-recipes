@@ -2,17 +2,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: validating-webhook
+  name: {{ .Chart.Name }}-validating-webhook
   namespace: {{ .Values.namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: validating-webhook
+      app: {{ .Chart.Name }}-validating-webhook
   template:
     metadata:
       labels:
-        app: validating-webhook
+        app: {{ .Chart.Name }}-validating-webhook
     spec:
       replicas: {{ .Values.replicaCount }}
       {{- with .Values.imagePullSecrets }}
@@ -77,17 +77,17 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mutating-webhook
+  name: {{ .Chart.Name }}-mutating-webhook
   namespace: {{ .Values.namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mutating-webhook
+      app: {{ .Chart.Name }}-mutating-webhook
   template:
     metadata:
       labels:
-        app: mutating-webhook
+        app: {{ .Chart.Name }}-mutating-webhook
     spec:
       replicas: {{ .Values.replicaCount }}
       {{- with .Values.imagePullSecrets }}

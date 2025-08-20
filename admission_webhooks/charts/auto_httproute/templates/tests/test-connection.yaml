@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: webhook-test
+  name: {{ .Chart.Name }}-webhook-test
   namespace: {{ .Values.namespace }}
   annotations:
     "helm.sh/hook": test

@@ -48,7 +48,7 @@ service:
   type: ClusterIP
   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
   port: 8443
-  tlsEnabled: 0
+  tlsEnabled: 1
   tlsKeyFile: /certs/tls.key
   tlsCertificateFile: /certs/tls.crt
   workers: "4"
@@ -98,10 +98,4 @@ tlsVolumes:
   volumes:
   - name: tls
     secret:
-      secretName: webhook-tls
-
-nodeSelector: {}
-
-tolerations: []
-
-affinity: {}
+      secretName: auto-httproute-cert

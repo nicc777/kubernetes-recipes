@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: validating-webhook
+  name: {{ .Chart.Name }}-validating-webhook
   namespace: {{ .Values.namespace }}
 spec:
   type: {{ .Values.service.type }}
@@ -12,12 +12,12 @@ spec:
       protocol: TCP
       name: http
   selector:
-    app: validating-webhook
+    app: {{ .Chart.Name }}-validating-webhook
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mutating-webhook
+  name: {{ .Chart.Name }}-mutating-webhook
   namespace: {{ .Values.namespace }}
 spec:
   type: {{ .Values.service.type }}
@@ -27,4 +27,4 @@ spec:
       protocol: TCP
       name: http
   selector:
-    app: mutating-webhook
+    app: {{ .Chart.Name }}-mutating-webhook
