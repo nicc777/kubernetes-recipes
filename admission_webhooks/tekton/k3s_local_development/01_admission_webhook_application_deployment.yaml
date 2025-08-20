@@ -35,6 +35,11 @@ spec:
             valuesObject:
               service:
                 tlsEnabled: "1"
+              image:
+                validationWebhook:
+                  tag: validation-webhook-r0.5
+                mutationWebhook:
+                  tag: mutation-webhook-r0.2
             skipCrds: false
             skipSchemaValidation: false
         destination:
