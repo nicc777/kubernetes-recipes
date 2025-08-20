@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: admission-webhook-task
+  name: auto-httproute-create-task
   namespace: bootstrapping
 spec:
   workspaces:
@@ -19,7 +19,7 @@ spec:
       apiVersion: argoproj.io/v1alpha1
       kind: Application
       metadata:
-        name: admission-webhooks
+        name: auto-httproute-admission-webhooks
         namespace: argocd
         finalizers:
           - resources-finalizer.argocd.argoproj.io
@@ -33,8 +33,9 @@ spec:
           path: admission_webhooks/charts/auto_httproute
           helm:
             valuesObject:
-              service:
+              applicationSettings:
                 tlsEnabled: 1
+                debug: 1
               image:
                 validationWebhook:
                   tag: validation-webhook-r0.6
@@ -78,24 +79,12 @@ spec:
       #!/usr/bin/env bash
       kubectl apply -f $(workspaces.shared-data.path)/admission-webhook-application.yaml
       sleep 30
-  - name: get-ca-bundle-data
-    image: bitnami/kubectl:latest
-    script: |
-      #!/usr/bin/env bash
-      kubectl get secrets -n default
-      echo "----------------------------------------"
-      export CA_BUNDLE=$(kubectl get secret webhook-tls -n default -o jsonpath='{.data.ca\.crt}')
-      echo "CA Bunbdle:"
-      echo
-      echo $CA_BUNDLE
-      echo "----------------------------------------"
-
 
 ---
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: end-task
+  name: auto-httproute-create-end-task
   namespace: bootstrapping
 spec:
   workspaces:
@@ -104,6 +93,17 @@ spec:
   # - name: ws-env
   #   mountPath: /data/.env
   steps:
+  - name: get-ca-bundle-data
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl get secrets -n default
+      echo "----------------------------------------"
+      export CA_BUNDLE=$(kubectl get secret auto-httproute-cert -n default -o jsonpath='{.data.ca\.crt}')
+      echo "CA Bundle:"
+      echo
+      echo $CA_BUNDLE
+      echo "----------------------------------------"
   - name: print-done-message
     image: bitnami/kubectl:latest
     script: |
@@ -121,48 +121,53 @@ spec:
       kubectl get namespaces
       echo
       echo "----------------------------------------"
+      echo "ArgoCD Applications:"
+      echo "----------------------------------------"
+      echo
+      kubectl get applications -n argocd
+      echo
+      echo "----------------------------------------"
+      echo "Admission Web Hook Application:"
+      echo "----------------------------------------"
+      echo
+      kubectl describe application/auto-httproute-admission-webhooks -n argocd
+      echo
+      echo "----------------------------------------"
       echo
       echo "DONE !!!"
 ---
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: admission-webhook-pipeline
+  name: auto-httproute-admission-webhook-create-pipeline
   namespace: bootstrapping
 spec:
   workspaces:
-  # - name: ws-env
   - name: shared-data
   tasks:
-  - name: run-admission-webhook-task
+  - name: run-auto-httproute-create-task
     taskRef:
-      name: admission-webhook-task
+      name: auto-httproute-create-task
     workspaces:
-    # - name: ws-env
     - name: shared-data
-  - name: run-end-task
+  - name: run-auto-httproute-create-end-task
     runAfter:
-    - run-admission-webhook-task
+    - run-auto-httproute-create-task
     taskRef:
-      name: end-task
+      name: auto-httproute-create-end-task
     workspaces:
-    # - name: ws-env
     - name: shared-data
 ---
-#apiVersion: tekton.dev/v1
 apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
-  name: admission-webhook-run
+  name: auto-httproute-admission-webhook-create-run
   namespace: bootstrapping
 spec:
   serviceAccountName: tekton-cluster-admin-sa
   pipelineRef:
-    name: admission-webhook-pipeline
+    name: auto-httproute-admission-webhook-create-pipeline
   workspaces:
   - name: shared-data
     persistentVolumeClaim:
       claimName: shared-task-storage
-  # - name: ws-env
-  #   secret:
-  #     secretName: env-secret

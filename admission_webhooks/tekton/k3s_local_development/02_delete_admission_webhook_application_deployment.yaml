@@ -1,0 +1,103 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: auto-httproute-delete-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  # - name: ws-env
+  #   mountPath: /data/.env
+  steps:
+  - name: delete-application-manifest
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      rm -vf $(workspaces.shared-data.path)/admission-webhook-application.yaml
+  - name: delete-application
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl delete application/auto-httproute-admission-webhooks -n argocd
+      sleep 30
+      kubectl delete secret/auto-httproute-cert -n default
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: auto-httproute-delete-end-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  steps:
+  - name: print-done-message
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "----------------------------------------"
+      echo "Created Files:"
+      echo "----------------------------------------"
+      echo
+      ls -lahrt $(workspaces.shared-data.path)/*.yaml
+      echo
+      echo "----------------------------------------"
+      echo "Namespaces:"
+      echo "----------------------------------------"
+      echo
+      kubectl get namespaces
+      echo
+      echo "----------------------------------------"
+      echo "ArgoCD Applications:"
+      echo "----------------------------------------"
+      echo
+      kubectl get applications -n argocd
+      echo
+      echo "----------------------------------------"
+      echo "Remaining Resources in default namespace:"
+      echo "----------------------------------------"
+      echo
+      kubectl get pods,services,deployments,persistentvolumeclaims,secrets -n default
+      echo
+      echo "----------------------------------------"
+      echo "DONE !!!"
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: auto-httproute-admission-webhook-delete-pipeline
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+  tasks:
+  - name: run-auto-httproute-delete-task
+    taskRef:
+      name: auto-httproute-delete-task
+    workspaces:
+    - name: shared-data
+  - name: run-auto-httproute-delete-end-task
+    runAfter:
+    - run-auto-httproute-delete-task
+    taskRef:
+      name: auto-httproute-delete-end-task
+    workspaces:
+    - name: shared-data
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: auto-httproute-admission-webhook-delete-run
+  namespace: bootstrapping
+spec:
+  serviceAccountName: tekton-cluster-admin-sa
+  pipelineRef:
+    name: auto-httproute-admission-webhook-delete-pipeline
+  workspaces:
+  - name: shared-data
+    persistentVolumeClaim:
+      claimName: shared-task-storage

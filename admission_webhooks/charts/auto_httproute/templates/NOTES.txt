@@ -1,22 +1,40 @@
-1. Get the application URL by running these commands:
-{{- if .Values.ingress.enabled }}
-{{- range $host := .Values.ingress.hosts }}
-  {{- range .paths }}
-  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
-  {{- end }}
-{{- end }}
-{{- else if contains "NodePort" .Values.service.type }}
-  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "auto_httproute.fullname" . }})
-  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
-  echo http://$NODE_IP:$NODE_PORT
-{{- else if contains "LoadBalancer" .Values.service.type }}
-     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-           You can watch its status by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "auto_httproute.fullname" . }}'
-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "auto_httproute.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
-  echo http://$SERVICE_IP:{{ .Values.service.port }}
-{{- else if contains "ClusterIP" .Values.service.type }}
-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "auto_httproute.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
-  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
-  echo "Visit http://127.0.0.1:8080 to use your application"
-  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:$CONTAINER_PORT
+Application Deployed
+--------------------
+
+{{- if gt ( int .Values.applicationSettings.tlsEnabled ) 0 }}
+TLS Enabled - Admission controllers deployed.
+
+When you deploy a Service resource with the desired annotations, an HTTPRoute object will automatically be created.
+
+Annotations:
+
+  devops-expose-public: true                      # Default=false. If HTTPRoute objects link to this service, the 
+                                                  # deployment/update of this service will be denied. Also, new 
+                                                  # HTTPRoute objects will be denied.
+
+  devops-public-record-name: test                 # [REQUIRED, if service is publicly exposed] 
+
+  devops-service-target-port: 80                  # [REQUIRED, is services have multiple port definitions] Indicate
+                                                  # which is the HTTP port. Service HTTPS end-points are not yet
+                                                  # supported.
+
+  devops-skip-http-route-to-https-actions: false  # Default=false. If true, the HTTPRoute object allowing HTTP traffic
+                                                  # to the service will be allowed, otherwise a redirect to HTTP will
+                                                  # be enforced
+
+  devops-skip-mutation: false                     # Default=false. If set to true, the mutating web hook will not
+                                                  # create HTTPRoute objects. Set this to true if you are providing
+                                                  # your own HTTPRoute manifests.
+
+  devops-gateway-name: private-gateway            # Default=private-gateway
+
+  devops-gateway-http-section-name: http          # Default=http
+
+  devops-gateway-https-section-name: https        # Default=https
+
+  devops-domain-name: null                        # [REQUIRED, if service is publicly exposed] add the domain name, for
+                                                  # example "example.com". The final hostname will therefore be 
+                                                  # "test.example.com" (based on the public record name annotation.)
+{{- else }}
+WARNING: TLS was NOT enabled, and therefore the admission controllers were NOT deployed.
 {{- end }}
