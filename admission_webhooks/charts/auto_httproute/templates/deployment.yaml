@@ -60,14 +60,14 @@ spec:
           - name: SSL_KEY_FILE
             value: {{ .tlsKeyFile }}
           - name: USE_TL
-            value: {{ .tlsEnabled }}
+            value: {{ .tlsEnabled | quote }}
           {{- end }}
           - name: HOST
             value: "0.0.0.0"
           - name: PORT
-            value: {{ .Values.service.port }}
+            value: {{ .Values.service.port | quote }}
           - name: WORKERS
-            value: {{ .Values.service.port }}
+            value: {{ .Values.service.workers | quote }}
       {{ if eq .Values.service.tlsEnabled "1" }}
       volumes:
       - name: tls
@@ -147,14 +147,14 @@ spec:
           - name: SSL_KEY_FILE
             value: {{ .tlsKeyFile }}
           - name: USE_TL
-            value: {{ .tlsEnabled }}
+            value: {{ .tlsEnabled | quote }}
           {{- end }}
           - name: HOST
             value: "0.0.0.0"
           - name: PORT
-            value: {{ .Values.service.port }}
+            value: {{ .Values.service.port | quote }}
           - name: WORKERS
-            value: {{ .Values.service.port }}
+            value: {{ .Values.service.workers | quote }}
       {{ if eq .Values.service.tlsEnabled "1" }}
       volumes:
       - name: tls
