@@ -2,20 +2,88 @@
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: fix-task
+  name: admission-webhook-task
   namespace: bootstrapping
 spec:
   workspaces:
   - name: shared-data
     mountPath: /data/general
-  - name: ws-env
-    mountPath: /data/.env
+  # - name: ws-env
+  #   mountPath: /data/.env
   steps:
-  - name: fix-step
+  - name: prepare-application-manifest
     image: bitnami/kubectl:latest
     script: |
       #!/usr/bin/env bash
-      echo "The fixing of broken stuff is starting..."
+      cat <<EOF > $(workspaces.shared-data.path)/admission-webhook-application.yaml
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: admission-webhooks
+        namespace: argocd
+        finalizers:
+          - resources-finalizer.argocd.argoproj.io
+        labels:
+          name: admission-webhooks
+      spec:
+        project: default
+        source:
+          repoURL: https://github.com/nicc777/kubernetes-recipes.git
+          targetRevision: 3-finish-admission-webhooks
+          path: admission_webhooks/charts/auto_httproute
+          helm:
+            valuesObject:
+              service:
+                tlsEnabled: "1"
+            skipCrds: false
+            skipSchemaValidation: false
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: default
+        info:
+          - name: 'Repo:'
+            value: 'https://github.com/nicc777/kubernetes-recipes'
+        syncPolicy:
+          automated:
+            enable: true
+            prune: true
+            selfHeal: true
+            allowEmpty: false
+          syncOptions:
+          - Validate=false
+          - CreateNamespace=false
+          - PrunePropagationPolicy=foreground
+          - PruneLast=true
+          - RespectIgnoreDifferences=true
+          - ApplyOutOfSyncOnly=true
+          - SkipDryRunOnMissingResource=true
+          - Replace=true
+          retry:
+            limit: 5
+            backoff:
+              duration: 5s
+              factor: 2
+              maxDuration: 3m
+        revisionHistoryLimit: 10
+
+      EOF
+  - name: deploy-application
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl apply -f $(workspaces.shared-data.path)/admission-webhook-application.yaml
+      sleep 30
+  - name: get-ca-bundle-data
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl get secrets -n default
+      echo "----------------------------------------"
+      export CA_BUNDLE=$(kubectl get secret webhook-tls -n default -o jsonpath='{.data.ca\.crt}')
+      echo "CA Bunbdle:"
+      echo
+      echo $CA_BUNDLE
+      echo "----------------------------------------"
 
 ---
 apiVersion: tekton.dev/v1
@@ -27,8 +95,8 @@ spec:
   workspaces:
   - name: shared-data
     mountPath: /data/general
-  - name: ws-env
-    mountPath: /data/.env
+  # - name: ws-env
+  #   mountPath: /data/.env
   steps:
   - name: print-done-message
     image: bitnami/kubectl:latest
@@ -47,22 +115,13 @@ spec:
       kubectl get namespaces
       echo
       echo "----------------------------------------"
-      echo "Helm Charts Installed:"
-      echo "----------------------------------------"
-      echo
-      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
-      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
-      export HELM=$(workspaces.shared-data.path)/helm
-      $HELM list --all-namespaces
-      echo
-      echo "----------------------------------------"
       echo
       echo "DONE !!!"
 ---
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: bootstrap-k3s-pipeline-tmp
+  name: admission-webhook-pipeline
   namespace: bootstrapping
 spec:
   workspaces:
@@ -71,7 +130,7 @@ spec:
   tasks:
   - name: run-fix-task
     taskRef:
-      name: fix-task
+      name: admission-webhook-task
     workspaces:
     - name: ws-env
     - name: shared-data
@@ -88,16 +147,16 @@ spec:
 apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
-  name: bootstrap-run-tmp
+  name: admission-webhook-run
   namespace: bootstrapping
 spec:
   serviceAccountName: tekton-cluster-admin-sa
   pipelineRef:
-    name: bootstrap-k3s-pipeline-tmp
+    name: admission-webhook-pipeline
   workspaces:
   - name: shared-data
     persistentVolumeClaim:
       claimName: shared-task-storage
-  - name: ws-env
-    secret:
-      secretName: env-secret
+  # - name: ws-env
+  #   secret:
+  #     secretName: env-secret
