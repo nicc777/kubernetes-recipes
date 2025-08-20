@@ -37,9 +37,9 @@ spec:
                 tlsEnabled: 0
               image:
                 validationWebhook:
-                  tag: validation-webhook-r0.5
+                  tag: validation-webhook-r0.6
                 mutationWebhook:
-                  tag: mutation-webhook-r0.2
+                  tag: mutation-webhook-r0.3
             skipCrds: false
             skipSchemaValidation: false
         destination:
