@@ -35,9 +35,9 @@ metadata:
   name: nginx-service
   namespace: test-app
   annotations:
-    devops-expose-public: true
+    devops-expose-public: "true"
     devops-public-record-name: test-app
-    devops-service-target-port: 80
+    devops-service-target-port: "80"
     devops-gateway-name: private-gateway
     devops-gateway-http-section-name: http
     devops-gateway-https-section-name: https

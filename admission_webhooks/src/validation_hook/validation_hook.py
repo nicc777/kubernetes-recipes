@@ -5,7 +5,7 @@ from datetime import datetime
 import traceback
 import uuid
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, responses
 
 app = FastAPI()
 
@@ -61,6 +61,15 @@ logger.info("READY")
 logger.debug("Debug Enabled")
 
 
+def is_resolvable(fqdn: str, request_id: str = "no-request-id") -> bool:
+    try:
+        socket.gethostbyname(fqdn)
+        return True
+    except socket.gaierror:
+        logger.error("EXCEPTION: {}".format(traceback.format_exc()), request_id)
+    return False
+
+
 class Annotations:
     """
     metadata:
@@ -99,13 +108,17 @@ class Annotations:
         self.gateway_https_section_name = gateway_https_section_name
         self.domain_name = domain_name
         self.request_id = request_id
+        self.validation_passed = True
+        self.fail_reason = list()
+        self.warnings = list()
         self.validate_annotations()
 
     def to_dict_as_is(self) -> dict:
         d = dict()
         d["annotations"] = dict()
-        d["warnings"] = list()
-        d["validation-pass"] = True
+        d["warnings"] = self.warnings
+        d["validation-pass"] = self.validation_passed
+        d["failure-reasons"] = self.fail_reason
         d["annotations"]["devops-expose-public"] = self.expose_public
         d["annotations"]["devops-public-record-name"] = self.public_record_name
         d["annotations"]["devops-service-target-port"] = self.service_target_port
@@ -125,21 +138,21 @@ class Annotations:
 
     def validate_annotations(self):
         if self.gateway_name is None and self.expose_public is True:
-            raise Exception(
-                "Annotation devops-gateway-name is required when devops-expose-public is set to true."
-            )
+            self.validation_passed = False
+            self.fail_reason.append("Annotation devops-gateway-name is required when devops-expose-public is set to true.")
         if self.gateway_http_section_name is None and self.expose_public is True:
-            raise Exception(
-                "Annotation devops-gateway-http-section-name is required when devops-expose-public is set to true."
-            )
+            self.validation_passed = False
+            self.fail_reason.sppend("Annotation devops-gateway-http-section-name is required when devops-expose-public is set to true.")
         if self.gateway_https_section_name is None and self.expose_public is True:
-            raise Exception(
-                "Annotation devops-gateway-https-section-name is required when devops-expose-public is set to true."
-            )
+            self.validation_passed = False
+            self.fail_reason = , append("Annotation devops-gateway-https-section-name is required when devops-expose-public is set to true.")
         if self.domain_name is None and self.expose_public is True:
-            raise Exception(
-                "Annotation devops-domain-name is required when devops-expose-public is set to true."
-            )
+            self.validation_passed = False
+            self.fail_reason.append("Annotation devops-domain-name is required when devops-expose-public is set to true.")
+        if self.validation_passed is True and self.expose_public is True:
+            fqdn = '{}.{}'.format(self.public_record_name, seld.domain_name)
+            if is_resolvable(fqdn=fqdn, request_id=self.request_id) is False:
+                self.warnings.append("The current FQDN does not resolve! You may need to still update your DNS. FQDN={}".format(fqdn))
 
     def to_dict_sanitized(self) -> dict:
         d = self.to_dict_as_is()
@@ -325,12 +338,15 @@ def post_validate(data: dict):
     result = copy.deepcopy(RESPONSE_TEMPLATE)
     uid = None
     validation_result = True
+    validation_failed_reason = None
+    warnings = None
     try:
         data = validate_request_data(data=data)
         uid = data["request"]["uid"]
     except:
         logger.error(traceback.format_exc())
         validation_result = False
+        validation_failed_reason = "General annotation validation failure. Please check the validation webhook logs."
     try:
         if (
             ignore_namespace(
@@ -363,6 +379,11 @@ def post_validate(data: dict):
                         ),
                         request_id,
                     )
+                    validation_result = annotations.validation_passed
+                    if len(annotations.fail_reason) > 0:
+                        validation_failed_reason = " ".join(annotations.fail_reason)
+                    if len(annotations.warnings) > 0:
+                        warnings = copy.deepcopy(annotations.warnings)
                 else:
                     logger.warning(
                         "Received an unkown data object kind. Expecting a `AdmissionReview` but got `{}`".format(
@@ -377,6 +398,16 @@ def post_validate(data: dict):
 
     result["response"]["uid"] = uid
     result["response"]["allowed"] = validation_result
+    if validation_result is False:
+        result["response"]["status"] = dict()
+        if validation_failed_reason is not None:
+            result["response"]["status"]["code"] = 403
+            result["response"]["status"]["message"] = validation_failed_reason
+        else:
+            result["response"]["status"]["code"] = 403
+            result["response"]["status"]["message"] = "Check the validation webhook logs for details."
+    if warnings is not None:
+        result["response"]["warnings"] = warnings
     logger.debug(
         "Final Return Data: {}".format(json.dumps(result, indent=4)), request_id
     )
