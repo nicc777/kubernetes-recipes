@@ -1,0 +1,121 @@
+{
+  "kind": "AdmissionReview",
+  "apiVersion": "admission.k8s.io/v1",
+  "request": {
+    "uid": "d57a8de0-1b34-4dea-b6c4-7caa1ee64286",
+    "kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
+    },
+    "resource": {
+      "group": "",
+      "version": "v1",
+      "resource": "services"
+    },
+    "requestKind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
+    },
+    "requestResource": {
+      "group": "",
+      "version": "v1",
+      "resource": "services"
+    },
+    "name": "nginx-service",
+    "namespace": "test-app",
+    "operation": "CREATE",
+    "userInfo": {
+      "username": "system:admin",
+      "groups": [
+        "system:masters",
+        "system:authenticated"
+      ],
+      "extra": {
+        "authentication.kubernetes.io/credential-id": [
+          "X509SHA256=c9fe31f94a66f8366288504780c8c2ea309dadec31eb1f9c0a4fbdd1056a820c"
+        ]
+      }
+    },
+    "object": {
+      "kind": "Service",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "nginx-service",
+        "namespace": "test-app",
+        "uid": "e76232df-1c93-4272-badb-cf0dc4b00413",
+        "creationTimestamp": "2025-08-22T04:32:40Z",
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"name\":\"nginx-service\",\"namespace\":\"test-app\"},\"spec\":{\"ports\":[{\"port\":80,\"protocol\":\"TCP\",\"targetPort\":80}],\"selector\":{\"app\":\"nginx\"},\"type\":\"ClusterIP\"}}\n"
+        },
+        "managedFields": [
+          {
+            "manager": "kubectl-client-side-apply",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2025-08-22T04:32:40Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                }
+              },
+              "f:spec": {
+                "f:internalTrafficPolicy": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"port\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:port": {},
+                    "f:protocol": {},
+                    "f:targetPort": {}
+                  }
+                },
+                "f:selector": {},
+                "f:sessionAffinity": {},
+                "f:type": {}
+              }
+            }
+          }
+        ]
+      },
+      "spec": {
+        "ports": [
+          {
+            "protocol": "TCP",
+            "port": 80,
+            "targetPort": 80
+          }
+        ],
+        "selector": {
+          "app": "nginx"
+        },
+        "clusterIP": "10.43.141.228",
+        "clusterIPs": [
+          "10.43.141.228"
+        ],
+        "type": "ClusterIP",
+        "sessionAffinity": "None",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "internalTrafficPolicy": "Cluster"
+      },
+      "status": {
+        "loadBalancer": {}
+      }
+    },
+    "oldObject": null,
+    "dryRun": false,
+    "options": {
+      "kind": "CreateOptions",
+      "apiVersion": "meta.k8s.io/v1",
+      "fieldManager": "kubectl-client-side-apply",
+      "fieldValidation": "Strict"
+    }
+  }
+}

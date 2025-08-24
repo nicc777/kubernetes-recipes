@@ -160,7 +160,7 @@ export ISSUER_URL="https://acme-v02.api.letsencrypt.org/directory"
 #   alert-manager
 #   gitea-k3s
 #   giea-k3s-pgadmin
-export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80:grafana,kube-prometheus,kube-prometheus-grafana,80:prometheus,kube-prometheus,kube-prometheus-kube-prome-prometheus,9090:alert-manager,kube-prometheus,kube-prometheus-kube-prome-alertmanager,9093:gitea:devops:gitea-http:3000:gitea-k3s,devops,gitea-http,3000:gitea-k3s-pgadmin,devops,pgadmin-service,80
+export ROUTES=tekton,tekton-pipelines,tekton-dashboard,9097:argocd,argocd,argocd-server,80:grafana,kube-prometheus,kube-prometheus-grafana,80:prometheus,kube-prometheus,kube-prometheus-kube-prome-prometheus,9090:alert-manager,kube-prometheus,kube-prometheus-kube-prome-alertmanager,9093:gitea-k3s,devops,gitea-http,3000:gitea-k3s-pgadmin,devops,pgadmin-service,80
 EOF
 
 chmod 600 $HOME/.k3s_local_dev_env
