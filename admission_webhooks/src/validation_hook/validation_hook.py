@@ -139,20 +139,32 @@ class Annotations:
     def validate_annotations(self):
         if self.gateway_name is None and self.expose_public is True:
             self.validation_passed = False
-            self.fail_reason.append("Annotation devops-gateway-name is required when devops-expose-public is set to true.")
+            self.fail_reason.append(
+                "Annotation devops-gateway-name is required when devops-expose-public is set to true."
+            )
         if self.gateway_http_section_name is None and self.expose_public is True:
             self.validation_passed = False
-            self.fail_reason.sppend("Annotation devops-gateway-http-section-name is required when devops-expose-public is set to true.")
+            self.fail_reason.sppend(
+                "Annotation devops-gateway-http-section-name is required when devops-expose-public is set to true."
+            )
         if self.gateway_https_section_name is None and self.expose_public is True:
             self.validation_passed = False
-            self.fail_reason = , append("Annotation devops-gateway-https-section-name is required when devops-expose-public is set to true.")
+            self.fail_reason.append(
+                "Annotation devops-gateway-https-section-name is required when devops-expose-public is set to true."
+            )
         if self.domain_name is None and self.expose_public is True:
             self.validation_passed = False
-            self.fail_reason.append("Annotation devops-domain-name is required when devops-expose-public is set to true.")
+            self.fail_reason.append(
+                "Annotation devops-domain-name is required when devops-expose-public is set to true."
+            )
         if self.validation_passed is True and self.expose_public is True:
-            fqdn = '{}.{}'.format(self.public_record_name, seld.domain_name)
+            fqdn = "{}.{}".format(self.public_record_name, seld.domain_name)
             if is_resolvable(fqdn=fqdn, request_id=self.request_id) is False:
-                self.warnings.append("The current FQDN does not resolve! You may need to still update your DNS. FQDN={}".format(fqdn))
+                self.warnings.append(
+                    "The current FQDN does not resolve! You may need to still update your DNS. FQDN={}".format(
+                        fqdn
+                    )
+                )
 
     def to_dict_sanitized(self) -> dict:
         d = self.to_dict_as_is()
@@ -405,7 +417,9 @@ def post_validate(data: dict):
             result["response"]["status"]["message"] = validation_failed_reason
         else:
             result["response"]["status"]["code"] = 403
-            result["response"]["status"]["message"] = "Check the validation webhook logs for details."
+            result["response"]["status"]["message"] = (
+                "Check the validation webhook logs for details."
+            )
     if warnings is not None:
         result["response"]["warnings"] = warnings
     logger.debug(
