@@ -312,13 +312,18 @@ def ignore_namespace(namespace: str, request_id: str = "no-request-id") -> bool:
     return False
 
 
+def _get_operation(data: dict) -> str:
+    operation = "ADD"
+    if "request" not in data:
+        return operation
+    if "operation" not in data["request"]:
+        return operation
+    return data["request"]["operation"].upper()
+
+
 def _get_effective_object_key(data: dict) -> str:
     key_name = "object"
-    if "request" not in data:
-        return key_name
-    if "operation" not in data["request"]:
-        return key_name
-    if data["request"]["operation"].upper() == "DELETE":
+    if _get_operation(data) == "DELETE":
         key_name = "oldObject"
     return key_name
 
@@ -556,8 +561,17 @@ def _service_build_final_response(
     uid: str | None,
     warnings: list | None,
     request_id: str,
+    original_data: dict,
 ) -> dict:
     result = copy.deepcopy(RESPONSE_TEMPLATE)
+    if (
+        _get_operation(original_data) == "DELETE"
+        or annotations.is_managed_by_argocd is True
+    ):
+        result["response"]["uid"] = uid
+        result["response"]["allowed"] = True
+        return result
+
     if annotations is not None:
         annotation_data = annotations.to_dict_sanitized()
         if (
@@ -606,4 +620,4 @@ def post_validate(data: dict):
             uid, validation_failed_reason, warnings, request_id
         )
 
-    return _service_build_final_response(annotations, uid, warnings, request_id)
+    return _service_build_final_response(annotations, uid, warnings, request_id, data)

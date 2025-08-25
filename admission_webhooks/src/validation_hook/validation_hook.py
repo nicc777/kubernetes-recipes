@@ -207,13 +207,18 @@ def ignore_namespace(namespace: str, request_id: str = "no-request-id") -> bool:
     return False
 
 
+def _get_operation(data: dict) -> str:
+    operation = "ADD"
+    if "request" not in data:
+        return operation
+    if "operation" not in data["request"]:
+        return operation
+    return data["request"]["operation"].upper()
+
+
 def _get_effective_object_key(data: dict) -> str:
     key_name = "object"
-    if "request" not in data:
-        return key_name
-    if "operation" not in data["request"]:
-        return key_name
-    if data["request"]["operation"].upper() == "DELETE":
+    if _get_operation(data) == "DELETE":
         key_name = "oldObject"
     return key_name
 
@@ -365,6 +370,7 @@ def post_validate(data: dict):
         logger.error(traceback.format_exc())
         validation_result = False
         validation_failed_reason = "General annotation validation failure. Please check the validation webhook logs."
+
     try:
         if (
             ignore_namespace(
@@ -413,6 +419,11 @@ def post_validate(data: dict):
                 logger.warning("Unknown data object", request_id)
     except:
         logger.error("EXCEPTION: {}".format(traceback.format_exc()), request_id)
+
+    if _get_operation(data) == "DELETE" or annotations.is_managed_by_argocd is True:
+        result["response"]["uid"] = uid
+        result["response"]["allowed"] = True
+        return result
 
     result["response"]["uid"] = uid
     result["response"]["allowed"] = validation_result
