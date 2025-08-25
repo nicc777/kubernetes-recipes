@@ -564,15 +564,17 @@ def _service_build_final_response(
     original_data: dict,
 ) -> dict:
     result = copy.deepcopy(RESPONSE_TEMPLATE)
-    if (
-        _get_operation(original_data) == "DELETE"
-        or annotations.is_managed_by_argocd is True
-    ):
+    if _get_operation(original_data) == "DELETE":
         result["response"]["uid"] = uid
         result["response"]["allowed"] = True
         return result
 
     if annotations is not None:
+        if annotations.is_managed_by_argocd is True:
+            result["response"]["uid"] = uid
+            result["response"]["allowed"] = True
+            return result
+
         annotation_data = annotations.to_dict_sanitized()
         if (
             len(annotation_data["patches"]) > 0

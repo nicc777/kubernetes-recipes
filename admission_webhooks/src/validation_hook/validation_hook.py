@@ -420,10 +420,16 @@ def post_validate(data: dict):
     except:
         logger.error("EXCEPTION: {}".format(traceback.format_exc()), request_id)
 
-    if _get_operation(data) == "DELETE" or annotations.is_managed_by_argocd is True:
+    if _get_operation(data) == "DELETE":
         result["response"]["uid"] = uid
         result["response"]["allowed"] = True
         return result
+
+    if annotations is not None:
+        if annotations.is_managed_by_argocd is True:
+            result["response"]["uid"] = uid
+            result["response"]["allowed"] = True
+            return result
 
     result["response"]["uid"] = uid
     result["response"]["allowed"] = validation_result
