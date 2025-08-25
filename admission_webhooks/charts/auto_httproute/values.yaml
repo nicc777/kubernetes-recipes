@@ -9,11 +9,11 @@ image:
   validationWebhook:
     repository: ghcr.io/nicc777/kubernetes-recipes/admission-validation-webhook
     pullPolicy: IfNotPresent
-    tag: "latest"
+    tag: "validation-webhook-r0.10"
   mutationWebhook:
     repository: ghcr.io/nicc777/kubernetes-recipes/admission-mutation-webhook
     pullPolicy: IfNotPresent
-    tag: "latest"
+    tag: "mutation-webhook-r0.3"
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []

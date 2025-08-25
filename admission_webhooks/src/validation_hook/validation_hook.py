@@ -1,9 +1,10 @@
 import json
 import copy
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 import traceback
 import uuid
+import socket
 
 from fastapi import FastAPI, HTTPException, responses
 
@@ -41,19 +42,33 @@ if os.getenv("DEBUG", "0").lower()[0] in (
 
 class Logger:
     def info(self, message, request_id: str = "no-request-id"):
-        print("{} - [{}] - [INFO] {}".format(datetime.utcnow(), request_id, message))
+        print(
+            "{} - [{}] - [INFO] {}".format(
+                datetime.now(tz=timezone.utc), request_id, message
+            )
+        )
 
     def debug(self, message, request_id: str = "no-request-id"):
         if debug is True:
             print(
-                "{} - [{}] - [DEBUG] {}".format(datetime.utcnow(), request_id, message)
+                "{} - [{}] - [DEBUG] {}".format(
+                    datetime.now(tz=timezone.utc), request_id, message
+                )
             )
 
     def error(self, message, request_id: str = "no-request-id"):
-        print("{} - [{}] - [ERROR] {}".format(datetime.utcnow(), request_id, message))
+        print(
+            "{} - [{}] - [ERROR] {}".format(
+                datetime.now(tz=timezone.utc), request_id, message
+            )
+        )
 
     def warning(self, message, request_id: str = "no-request-id"):
-        print("{} - [{}] - [WARNING] {}".format(datetime.utcnow(), request_id, message))
+        print(
+            "{} - [{}] - [WARNING] {}".format(
+                datetime.now(tz=timezone.utc), request_id, message
+            )
+        )
 
 
 logger = Logger()
@@ -71,20 +86,6 @@ def is_resolvable(fqdn: str, request_id: str = "no-request-id") -> bool:
 
 
 class Annotations:
-    """
-    metadata:
-      annotations:
-        devops-expose-public: true # Default=false. If HTTPRoute objects link to this service, the deployment/update of this service will be denied. Also, new HTTPRoute objects will be denied.
-        devops-public-record-name: test # [REQUIRED, if service is publicly exposed]
-        devops-service-target-port: 80 # [REQUIRED, is services have multiple port definitions] Indicate which is the HTTP port. Service HTTPS end-points are not yet supported.
-        devops-skip-http-route-to-https-actions: false # Default=false. If true, the HTTPRoute object allowing HTTP traffic to the service will be allowed, otherwise a redirect to HTTP will be enforced
-        devops-skip-mutation: false # Default=false. If set to true, the mutating web hook will not create HTTPRoute objects. Set this to true if you are providing your own HTTPRoute manifests.
-        devops-gateway-name: private-gateway # Default=private-gateway
-        devops-gateway-http-section-name: http # Default=http
-        devops-gateway-https-section-name: https # Default=https
-        devops-domain-name: null # [REQUIRED, if service is publicly exposed] add the domain name, for example "example.com". The final hostname will therefore be "test.example.com" (based on the public record name annotation.)
-    """
-
     def __init__(
         self,
         expose_public: bool = False,
@@ -144,7 +145,7 @@ class Annotations:
             )
         if self.gateway_http_section_name is None and self.expose_public is True:
             self.validation_passed = False
-            self.fail_reason.sppend(
+            self.fail_reason.append(
                 "Annotation devops-gateway-http-section-name is required when devops-expose-public is set to true."
             )
         if self.gateway_https_section_name is None and self.expose_public is True:
@@ -158,7 +159,7 @@ class Annotations:
                 "Annotation devops-domain-name is required when devops-expose-public is set to true."
             )
         if self.validation_passed is True and self.expose_public is True:
-            fqdn = "{}.{}".format(self.public_record_name, seld.domain_name)
+            fqdn = "{}.{}".format(self.public_record_name, self.domain_name)
             if is_resolvable(fqdn=fqdn, request_id=self.request_id) is False:
                 self.warnings.append(
                     "The current FQDN does not resolve! You may need to still update your DNS. FQDN={}".format(
@@ -273,17 +274,6 @@ def get_service_ports(data: dict, request_id: str = "no-request-id") -> list:
 def parse_data_to_generate_annotation_object(
     data: dict, request_id: str = "no-request-id"
 ) -> Annotations:
-    """
-    devops-expose-public: true # Default=false. If HTTPRoute objects link to this service, the deployment/update of this service will be denied. Also, new HTTPRoute objects will be denied.
-    devops-public-record-name: test # [REQUIRED, if service is publicly exposed]
-    devops-service-target-port: 80 # [REQUIRED, is services have multiple port definitions] Indicate which is the HTTP port. Service HTTPS end-points are not yet supported.
-    devops-skip-http-route-to-https-actions: false # Default=false. If true, the HTTPRoute object allowing HTTP traffic to the service will be allowed, otherwise a redirect to HTTP will be enforced
-    devops-skip-mutation: false # Default=false. If set to true, the mutating web hook will not create HTTPRoute objects. Set this to true if you are providing your own HTTPRoute manifests.
-    devops-gateway-name: private-gateway # Default=private-gateway
-    devops-gateway-http-section-name: http # Default=http
-    devops-gateway-https-section-name: https # Default=https
-    devops-domain-name: null # [REQUIRED, if service is publicly exposed] add the domain name, for example "example.com". The final hostname will therefore be "test.example.com" (based on the public record name annotation.)
-    """
     service_ports = get_service_ports(data=data)
     metadata = data["request"]["object"]["metadata"]
     expose_public = False

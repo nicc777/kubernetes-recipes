@@ -34,11 +34,6 @@ spec:
                 applicationSettings:
                   tlsEnabled: 1
                   debug: 1
-                image:
-                  validationWebhook:
-                    tag: validation-webhook-r0.10
-                  mutationWebhook:
-                    tag: mutation-webhook-r0.3
               skipCrds: false
               skipSchemaValidation: false
           destination:
