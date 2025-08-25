@@ -425,12 +425,6 @@ def post_validate(data: dict):
         result["response"]["allowed"] = True
         return result
 
-    if annotations is not None:
-        if annotations.is_managed_by_argocd is True:
-            result["response"]["uid"] = uid
-            result["response"]["allowed"] = True
-            return result
-
     result["response"]["uid"] = uid
     result["response"]["allowed"] = validation_result
     if validation_result is False:

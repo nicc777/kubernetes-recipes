@@ -9,7 +9,7 @@ image:
   validationWebhook:
     repository: ghcr.io/nicc777/kubernetes-recipes/admission-validation-webhook
     pullPolicy: IfNotPresent
-    tag: "validation-webhook-r0.15"
+    tag: "validation-webhook-r0.16"
   mutationWebhook:
     repository: ghcr.io/nicc777/kubernetes-recipes/admission-mutation-webhook
     pullPolicy: IfNotPresent
