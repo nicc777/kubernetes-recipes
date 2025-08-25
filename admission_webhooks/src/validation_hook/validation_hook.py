@@ -207,6 +207,17 @@ def ignore_namespace(namespace: str, request_id: str = "no-request-id") -> bool:
     return False
 
 
+def _get_effective_object_key(data: dict) -> str:
+    key_name = "object"
+    if "request" not in data:
+        return key_name
+    if "operation" not in data["request"]:
+        return key_name
+    if data["request"]["operation"].upper() == "DELETE":
+        key_name = "oldObject"
+    return key_name
+
+
 def validate_request_data(data: dict, request_id: str = "no-request-id") -> dict:
     e = Exception("Event Parsing Error. Aborting.")
     if isinstance(data, str):
@@ -235,15 +246,18 @@ def validate_request_data(data: dict, request_id: str = "no-request-id") -> dict
             )
         )
         raise e
-    if "object" not in data["request"]:
+
+    object_key = _get_effective_object_key(data)
+
+    if object_key not in data["request"]:
         logger.error(
-            "Expected key `request.object` was not found. data: {}".format(
-                json.dumps(data)
+            "Expected key `request.{}` was not found. data: {}".format(
+                object_key, json.dumps(data)
             ),
             request_id,
         )
         raise e
-    if "metadata" not in data["request"]["object"]:
+    if "metadata" not in data["request"][object_key]:
         logger.error(
             "Expected key `request.object.metadata` was not found. data: {}".format(
                 json.dumps(data), request_id
@@ -255,13 +269,14 @@ def validate_request_data(data: dict, request_id: str = "no-request-id") -> dict
 
 def get_service_ports(data: dict, request_id: str = "no-request-id") -> list:
     ports = list()
+    object_key = _get_effective_object_key(data)
     logger.debug(
         "Parsing ports from Service spec: {}".format(
-            json.dumps(data["request"]["object"]["spec"]["ports"])
+            json.dumps(data["request"][object_key]["spec"]["ports"])
         ),
         request_id,
     )
-    for ports_def in data["request"]["object"]["spec"]["ports"]:
+    for ports_def in data["request"][object_key]["spec"]["ports"]:
         ports.append(int(ports_def["port"]))
     logger.info("Service ports: {}".format(ports), request_id)
     if len(ports) == 0:
@@ -275,7 +290,8 @@ def parse_data_to_generate_annotation_object(
     data: dict, request_id: str = "no-request-id"
 ) -> Annotations:
     service_ports = get_service_ports(data=data)
-    metadata = data["request"]["object"]["metadata"]
+    object_key = _get_effective_object_key(data)
+    metadata = data["request"][object_key]["metadata"]
     expose_public = False
     public_record_name = None
     service_target_port = None
