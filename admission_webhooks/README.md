@@ -12,6 +12,8 @@ This recipe shows an example of an admission webhook implementation in Python. T
 - [Walk Through of the Python Webhook Implementation](#walk-through-of-the-python-webhook-implementation)
   * [Validation](#validation)
   * [Mutation](#mutation)
+- [The HTTPRoute Controller](#the-httproute-controller)
+  * [Basic Processing Logic](#basic-processing-logic)
 - [Preparing the Certificates for the Webhook Applications](#preparing-the-certificates-for-the-webhook-applications)
 - [Deployment of the Web Hooks](#deployment-of-the-web-hooks)
 - [Looking at various test scenarios](#looking-at-various-test-scenarios)
@@ -169,6 +171,21 @@ The placeholder to annotation mapping is listed next:
 | `__DOMAIN__` | `devops-domain-name` |
 
 The `Service` will also have updated annotations to reflect the actual values (for those annotations not added).
+
+## The HTTPRoute Controller
+
+### Basic Processing Logic
+
+| Process | Description |
+|---|---|
+| Watch for Changes | The controller constantly watches the Kubernetes API server for changes to the resources it's responsible for. This is done through a "watch" API call. When an event occurs (a resource is created, updated, or deleted), the controller is notified. |
+| Add to Work Queue | When a change is detected, the controller doesn't process it immediately. Instead, it adds the object's unique identifier (e.g., its name and namespace) to a **work queue**. This queue ensures that requests are processed in an orderly and efficient manner. |
+| Dequeue and Reconcile | A worker from a pool of goroutines (or threads) picks an item from the work queue. The controller's `Reconcile` function is then invoked with the object's identifier. This function is the heart of the reconciliation loop.|
+| Fetch the Desired State | Inside the `Reconcile` function, the controller fetches the latest version of the resource from the API server. This object represents the **desired state** that you, the user, have defined in your manifest. |
+| Compare States | The controller then inspects the **current state** of the cluster related to that resource. For a `Deployment`, it would check the number and status of associated `ReplicaSet`s and `Pod`s. It compares the current state against the desired state. |
+| Take Action | If a difference is found, the controller takes the necessary action to bridge the gap. |
+| Update Status | After taking action, the controller updates the `status` field of the resource to reflect the new current state. This allows you to monitor the controller's progress using commands like `kubectl get` or `kubectl describe`. |
+| Repeat | The entire process is a continuous loop. Even if no changes are detected, the controller periodically "re-queues" every object it manages to perform a full reconciliation. This ensures the cluster heals itself from any unlogged or missed state changes, guaranteeing that the current state always converges toward the desired state. |
 
 ## Preparing the Certificates for the Webhook Applications
 
