@@ -35,13 +35,13 @@ metadata:
   name: nginx-service
   namespace: test-app
   annotations:
-    devops-expose-public: "true"
-    devops-public-record-name: test-app
-    devops-service-target-port: "80"
-    devops-gateway-name: private-gateway
-    devops-gateway-http-section-name: http
-    devops-gateway-https-section-name: https
-    devops-domain-name: example.com
+    auto-httproute/expose-public: "true"
+    auto-httproute/public-record-name: test-app
+    auto-httproute/service-target-port: "80"
+    auto-httproute/gateway-name: private-gateway
+    auto-httproute/gateway-http-section-name: http
+    auto-httproute/gateway-https-section-name: https
+    auto-httproute/domain-name: example.com
 spec:
   selector:
     app: nginx

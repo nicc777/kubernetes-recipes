@@ -120,43 +120,43 @@ class Annotations:
         d["warnings"] = self.warnings
         d["validation-pass"] = self.validation_passed
         d["failure-reasons"] = self.fail_reason
-        d["annotations"]["devops-expose-public"] = self.expose_public
-        d["annotations"]["devops-public-record-name"] = self.public_record_name
-        d["annotations"]["devops-service-target-port"] = self.service_target_port
-        d["annotations"]["devops-skip-http-route-to-https-actions"] = (
+        d["annotations"]["auto-httproute/expose-public"] = self.expose_public
+        d["annotations"]["auto-httproute/public-record-name"] = self.public_record_name
+        d["annotations"]["auto-httproute/service-target-port"] = self.service_target_port
+        d["annotations"]["auto-httproute/skip-http-route-to-https-actions"] = (
             self.skip_http_route_to_https_actions
         )
-        d["annotations"]["devops-skip-mutation"] = self.skip_mutation
-        d["annotations"]["devops-gateway-name"] = self.gateway_name
-        d["annotations"]["devops-gateway-http-section-name"] = (
+        d["annotations"]["auto-httproute/skip-mutation"] = self.skip_mutation
+        d["annotations"]["auto-httproute/gateway-name"] = self.gateway_name
+        d["annotations"]["auto-httproute/gateway-http-section-name"] = (
             self.gateway_http_section_name
         )
-        d["annotations"]["devops-gateway-https-section-name"] = (
+        d["annotations"]["auto-httproute/gateway-https-section-name"] = (
             self.gateway_https_section_name
         )
-        d["annotations"]["devops-domain-name"] = self.domain_name
+        d["annotations"]["auto-httproute/domain-name"] = self.domain_name
         return d
 
     def validate_annotations(self):
         if self.gateway_name is None and self.expose_public is True:
             self.validation_passed = False
             self.fail_reason.append(
-                "Annotation devops-gateway-name is required when devops-expose-public is set to true."
+                "Annotation auto-httproute/gateway-name is required when auto-httproute/expose-public is set to true."
             )
         if self.gateway_http_section_name is None and self.expose_public is True:
             self.validation_passed = False
             self.fail_reason.append(
-                "Annotation devops-gateway-http-section-name is required when devops-expose-public is set to true."
+                "Annotation auto-httproute/gateway-http-section-name is required when auto-httproute/expose-public is set to true."
             )
         if self.gateway_https_section_name is None and self.expose_public is True:
             self.validation_passed = False
             self.fail_reason.append(
-                "Annotation devops-gateway-https-section-name is required when devops-expose-public is set to true."
+                "Annotation auto-httproute/gateway-https-section-name is required when auto-httproute/expose-public is set to true."
             )
         if self.domain_name is None and self.expose_public is True:
             self.validation_passed = False
             self.fail_reason.append(
-                "Annotation devops-domain-name is required when devops-expose-public is set to true."
+                "Annotation auto-httproute/domain-name is required when auto-httproute/expose-public is set to true."
             )
         if self.validation_passed is True and self.expose_public is True:
             fqdn = "{}.{}".format(self.public_record_name, self.domain_name)
@@ -170,11 +170,11 @@ class Annotations:
     def to_dict_sanitized(self) -> dict:
         d = self.to_dict_as_is()
         if self.expose_public is False:
-            del d["annotations"]["devops-public-record-name"]
-            del d["annotations"]["devops-gateway-name"]
-            del d["annotations"]["devops-gateway-http-section-name"]
-            del d["annotations"]["devops-gateway-https-section-name"]
-            del d["annotations"]["devops-domain-name"]
+            del d["annotations"]["auto-httproute/public-record-name"]
+            del d["annotations"]["auto-httproute/gateway-name"]
+            del d["annotations"]["auto-httproute/gateway-http-section-name"]
+            del d["annotations"]["auto-httproute/gateway-https-section-name"]
+            del d["annotations"]["auto-httproute/domain-name"]
         return d
 
 
@@ -311,26 +311,26 @@ def parse_data_to_generate_annotation_object(
             logger.debug(
                 "Evaluating Annotation: {}: {}".format(md_key, md_val), request_id
             )
-            if md_key == "devops-expose-public":
+            if md_key == "auto-httproute/expose-public":
                 if md_val.lower().startswith("t"):
                     expose_public = True
-            elif md_key == "devops-public-record-name":
+            elif md_key == "auto-httproute/public-record-name":
                 public_record_name = "{}".format(md_val)
-            elif md_key == "devops-service-target-port":
+            elif md_key == "auto-httproute/service-target-port":
                 service_target_port = int(md_val)
-            elif md_key == "devops-skip-http-route-to-https-actions":
+            elif md_key == "auto-httproute/skip-http-route-to-https-actions":
                 if md_val.lower().startswith("t"):
                     skip_http_route_to_https_actions = True
-            elif md_key == "devops-skip-mutation":
+            elif md_key == "auto-httproute/skip-mutation":
                 if md_val.lower().startswith("t"):
                     skip_mutation = True
-            elif md_key == "devops-gateway-name":
+            elif md_key == "auto-httproute/gateway-name":
                 gateway_name = "{}".format(md_val)
-            elif md_key == "devops-gateway-http-section-name":
+            elif md_key == "auto-httproute/gateway-http-section-name":
                 gateway_http_section_name = "{}".format(md_val)
-            elif md_key == "devops-gateway-https-section-name":
+            elif md_key == "auto-httproute/gateway-https-section-name":
                 gateway_https_section_name = "{}".format(md_val)
-            elif md_key == "devops-domain-name":
+            elif md_key == "auto-httproute/domain-name":
                 domain_name = "{}".format(md_val)
             else:
                 logger.info("Skipped annotation named `{}`".format(md_key), request_id)

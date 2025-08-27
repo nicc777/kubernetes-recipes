@@ -50,15 +50,15 @@ The annotation on a `Service` object required to allow public access:
 ```yaml
 metadata:
   annotations:
-    devops-expose-public: true # Default=false. If HTTPRoute objects link to this service, the deployment/update of this service will be denied. Also, new HTTPRoute objects will be denied.
-    devops-public-record-name: test # [REQUIRED, if service is publicly exposed] 
-    devops-service-target-port: 80 # [REQUIRED, is services have multiple port definitions] Indicate which is the HTTP port. Service HTTPS end-points are not yet supported.
-    devops-skip-http-route-to-https-actions: false # Default=false. If true, the HTTPRoute object allowing HTTP traffic to the service will be allowed, otherwise a redirect to HTTP will be enforced
-    devops-skip-mutation: false # Default=false. If set to true, the mutating web hook will not create HTTPRoute objects. Set this to true if you are providing your own HTTPRoute manifests.
-    devops-gateway-name: private-gateway # Default=private-gateway
-    devops-gateway-http-section-name: http # Default=http
-    devops-gateway-https-section-name: https # Default=https
-    devops-domain-name: null # [REQUIRED, if service is publicly exposed] add the domain name, for example "example.com". The final hostname will therefore be "test.example.com" (based on the public record name annotation.)
+    auto-httproute/expose-public: true # Default=false. If HTTPRoute objects link to this service, the deployment/update of this service will be denied. Also, new HTTPRoute objects will be denied.
+    auto-httproute/public-record-name: test # [REQUIRED, if service is publicly exposed] 
+    auto-httproute/service-target-port: 80 # [REQUIRED, is services have multiple port definitions] Indicate which is the HTTP port. Service HTTPS end-points are not yet supported.
+    auto-httproute/skip-http-route-to-https-actions: false # Default=false. If true, the HTTPRoute object allowing HTTP traffic to the service will be allowed, otherwise a redirect to HTTP will be enforced
+    auto-httproute/skip-mutation: false # Default=false. If set to true, the mutating web hook will not create HTTPRoute objects. Set this to true if you are providing your own HTTPRoute manifests.
+    auto-httproute/gateway-name: private-gateway # Default=private-gateway
+    auto-httproute/gateway-http-section-name: http # Default=http
+    auto-httproute/gateway-https-section-name: https # Default=https
+    auto-httproute/domain-name: null # [REQUIRED, if service is publicly exposed] add the domain name, for example "example.com". The final hostname will therefore be "test.example.com" (based on the public record name annotation.)
 ```
 
 By default, the following namespaces are excluded from the validation checks:
@@ -85,13 +85,13 @@ The validating web hook will register for the following resources with the relev
 
 - `Service` - Check if the annotations are present. Update the local `Valkey` cache accordingly.
   - Deny conditions:
-    - The `devops-public-record-name` record name was already defined previously
+    - The `auto-httproute/public-record-name` record name was already defined previously
 - `HTTPRoute` - Check if the linked service is allowed to expose the HTTP service publicly
   - Deny conditions:
     - The annotations to the linked `Service` was not present
-    - The annotation `devops-expose-public` is not present, or is set to `false`
+    - The annotation `auto-httproute/expose-public` is not present, or is set to `false`
     - If a corresponding `HTTPRoute` already exist (one will be automatically created by the mutating web hook, unless otherwise indicated by annotation)
-    - If multiple ports are defined in the `Service`, but the annotations does not include a `devops-service-target-port` annotation.
+    - If multiple ports are defined in the `Service`, but the annotations does not include a `auto-httproute/service-target-port` annotation.
   - Warnings:
     - If the DNS record has not been defined yet, serve a warning.
     - If the annotations indicate the use of a known HTTP port (non-secure) that is NOT automatically redirected to HTTPS
@@ -164,11 +164,11 @@ The placeholder to annotation mapping is listed next:
 | Placeholder | Annotation Mapping |
 |---|---|
 | `__NAME__` | The name will be the value of the `Service` name with the schema and `-route` appended. For example, a service named `my-service`, will have `HTTPRoute` names of `my-service-http-route` and `my-service-https-route` respectively. |
-| `__GATEWAY_NAME__` | `devops-gateway-name` |
-| `__GATEWAY_HTTP_SECTION_NAME__` | `devops-gateway-http-section-name` |
-| `__GATEWAY_HTTPS_SECTION_NAME__` | `devops-gateway-https-section-name` |
-| `__RECORD_NAME__` | `devops-public-record-name` |
-| `__DOMAIN__` | `devops-domain-name` |
+| `__GATEWAY_NAME__` | `auto-httproute/gateway-name` |
+| `__GATEWAY_HTTP_SECTION_NAME__` | `auto-httproute/gateway-http-section-name` |
+| `__GATEWAY_HTTPS_SECTION_NAME__` | `auto-httproute/gateway-https-section-name` |
+| `__RECORD_NAME__` | `auto-httproute/public-record-name` |
+| `__DOMAIN__` | `auto-httproute/domain-name` |
 
 The `Service` will also have updated annotations to reflect the actual values (for those annotations not added).
 
