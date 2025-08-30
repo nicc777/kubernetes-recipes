@@ -3,9 +3,12 @@ import time
 from datetime import datetime, timezone
 import json
 import traceback
+import copy
 
 import kr8s
 from kr8s.objects import new_class
+from kr8s.objects import Service, APIObject
+from box import Box
 
 
 NAMESPACE_NAMES_TO_IGNORE = [
@@ -19,6 +22,55 @@ NAMESPACE_NAMES_TO_IGNORE = [
     "nginx-gateway",
     "tekton-*",
 ]
+
+
+HTTPROUTE_TEMPLATES = {
+    "redirect": {
+        "apiVersion": "gateway.networking.k8s.io/v1",
+        "kind": "HTTPRoute",
+        "metadata": {"name": "__NAME__", "namespace": "__NAMESPACE__"},
+        "spec": {
+            "parentRefs": [
+                {
+                    "name": "__GATEWAY_NAME__",
+                    "sectionName": "__GATEWAY_SECTION_NAME__",
+                }
+            ],
+            "hostnames": ["__FQDN__"],
+            "rules": [
+                {
+                    "filters": [
+                        {
+                            "type": "RequestRedirect",
+                            "requestRedirect": {
+                                "scheme": "__GATEWAY_TARGET_SECTION_NAME__",
+                                "statusCode": 301,
+                            },
+                        }
+                    ]
+                }
+            ],
+        },
+    },
+    "default": {
+        "apiVersion": "gateway.networking.k8s.io/v1",
+        "kind": "HTTPRoute",
+        "metadata": {"name": "__NAME__", "namespace": "__NAMESPACE__"},
+        "spec": {
+            "parentRefs": [
+                {"name": "__GATEWAY_NAME__", "sectionName": "__GATEWAY_SECTION_NAME__"}
+            ],
+            "hostnames": ["__FQDN__"],
+            "rules": [
+                {
+                    "backendRefs": [
+                        {"name": "__SERVICE_NAME__", "port": "__SERVICE_TARGET_PORT__"}
+                    ]
+                }
+            ],
+        },
+    },
+}
 
 
 debug = False
@@ -65,10 +117,65 @@ def get_httproute_objects(namespace) -> list:
         httproute_objects.append(httproute_object.raw)
     logger.debug(
         "Found {} HTTPRoute Objects in namespace {}".format(
-            len(httproute_objects, namespace)
+            len(httproute_objects), namespace
         )
     )
     return httproute_objects
+
+
+class HttpRouteObjects:
+    def __init__(self, namespace: str) -> None:
+        self.httproute_objects = list()
+        self.namespace = namespace
+        self.refresh_objects()
+
+    def refresh_objects(self):
+        self.httproute_objects = get_httproute_objects(namespace=self.namespace)
+
+    def exists(self, name: str) -> bool:
+        o: APIObject
+        for o in self.httproute_objects:
+            if o.namespace == self.namespace and o.name == name:
+                return True
+        return False
+
+    def delete(self, namespace: str, name: str):
+        o: APIObject
+        for o in self.httproute_objects:
+            if o.namespace == namespace and o.name == name:
+                o.delete()
+        self.refresh_objects()
+
+    def create(self, http_route: APIObject) -> bool:
+        if http_route.namespace is not None:
+            if http_route.namespace != self.namespace:
+                logger.error(
+                    'Cannot create HTTPRoute object as the namespace "{}" does not match the current working namespace "{}"'.format(
+                        http_route.namespace, self.namespace
+                    )
+                )
+                return False
+        http_route.create()
+        self.refresh_objects()
+        return self.exists(name=http_route.name)
+
+    def new(self, kind: str = "default", parameters: dict = dict()) -> APIObject | None:
+        if len(parameters) == 0:
+            return None
+        data: dict | None
+        data = getattr(HTTPROUTE_TEMPLATES, kind, None)
+        if data is None:
+            return
+        data_json = json.dumps(data)
+        for k, v in parameters.items():
+            data_json = data_json.replace(k, v)
+        http_route: APIObject | None
+        http_route = None
+        try:
+            http_route = HTTPRoute(json.loads(data_json))
+        except:
+            logger.error("EXCEPTION: {}".format(traceback.format_exc()))
+        return http_route
 
 
 def ignore_namespace(namespace: str) -> bool:
@@ -95,25 +202,53 @@ def ignore_namespace(namespace: str) -> bool:
     return False
 
 
-# def get_httproute_object_linked_to_service(
-#     httproute_objects: list, service
-# ) -> dict | None:
-#     current_httproute_object = None
-#
-#     return current_httproute_object
+def get_timestamp_as_str() -> str:
+    now_utc = datetime.now(tz=timezone.utc)
+    return now_utc.isoformat().replace("+00:00", "Z")
 
 
-def get_current_service_status(service_status: box.Box) -> dict:
+def patch_service_last_probe_time(
+    namespace: str, service_name: str, condition: dict | Box | None
+):
+    if condition is None:
+        return
+    last_transition_time = getattr(condition, "lastTransitionTime", "unknown")
+    if last_transition_time == "unknown":
+        return
+    try:
+        service = Service.get(name=service_name, namespace=namespace)
+        patch_payload = {
+            "status": {
+                "conditions": [
+                    {
+                        "type": "AutoHTTPRouteReady",
+                        "status": getattr(condition, "status", "True"),
+                        "reason": getattr(condition, "reason", "default-status"),
+                        "messagie": getattr(
+                            condition, "message", "Status was set to True"
+                        ),
+                        "lastTransitionTime": last_transition_time,
+                        "lastProbeTime": get_timestamp_as_str(),
+                    }
+                ]
+            }
+        }
+        service.patch(patch_payload)
+    except:
+        logger.error("EXCEPTION: {}".format(traceback.format_exc()))
+
+
+def get_current_service_status(service_status: Box) -> dict:
     auto_httproute_status = dict()
     auto_httproute_status["reason"] = "not-required"
     auto_httproute_status["created"] = False
     conditions = getattr(service_status, "conditions", list())
     logger.debug("Retrieved {} status items".format(len(conditions)))
     for condition in conditions:
-        # {'type': 'AutoHTTPRouteCreated', 'status': 'True', 'lastTransitionTime': '2025-08-27T04:39:39Z', 'reason': 'provisioned', 'message': ''}
+        # {'type': 'AutoHTTPRouteReady', 'status': 'True', 'lastTransitionTime': '2025-08-27T04:39:39Z', 'reason': 'provisioned', 'message': ''}
         condition_type = getattr(condition, "type", None)
         if condition_type is not None:
-            if condition_type == "AutoHTTPRouteCreated":
+            if condition_type == "AutoHTTPRouteReady":
                 condition_created_as_str = getattr(
                     condition, "status", "false"
                 ).lower()[0]
@@ -129,58 +264,55 @@ def get_current_service_status(service_status: box.Box) -> dict:
 def patch_service_status(
     namespace: str, service_name: str, mark_as_created: bool = True
 ):
-    if mark_as_created is True:
-        # Create status for created httproute object
-        pass
-    else:
-        # Create a status reflecting that a httproute object is not required
-        pass
+    now_as_str = get_timestamp_as_str()
+    condition = {
+        "type": "AutoHTTPRouteReady",
+        "status": "True",
+        "reason": "HTTPRoute-Created",
+        "messagie": "A new HTTPRoute Object was created",
+        "lastTransitionTime": now_as_str,
+        "lastProbeTime": now_as_str,
+    }
+    if mark_as_created is False:
+        condition["status"] = "False"
+        condition["reason"] = "HTTPRoute-Not-Created"
+        condition["message"] = (
+            "A new HTTPRoute object was not created. Existing HTTPRoute objects was removed."
+        )
+    try:
+        service = Service.get(name=service_name, namespace=namespace)
+        patch_payload = {
+            "status": {
+                "conditions": [
+                    condition,
+                ]
+            }
+        }
+        service.patch(patch_payload)
+    except:
+        logger.error("EXCEPTION: {}".format(traceback.format_exc()))
 
 
 def was_httproute_created_for_service(
     namespace: str,
-    service_name: str,
-    service_status: box.Box,
     httproute_object_name_for_service: str,
 ) -> bool:
-    current_service_status = get_current_service_status(service_status)
-    http_route_object_created_for_service = False
-    httproute: HTTPRoute
+    httproute: APIObject
     for httproute in get_httproute_objects(namespace):
         if httproute_object_name_for_service == httproute.name:
-            http_route_object_created_for_service = True
-    if (
-        getattr(current_service_status, "created", False) is False
-        and http_route_object_created_for_service is True
-    ):
-        patch_service_status(namespace, service_name)
-    return http_route_object_created_for_service
-
-
-def services_requires_httproute(
-    namespace: str, service_name: str, annotations: box.Box
-) -> bool:
+            return True
     return False
 
 
-def create_httproute_for_service(
-    namespace: str,
-    service_name: str,
-    httproute_object_name_for_service: str,
-    annoitations: box.Box,
-    service_spec: box.Box,
-):
-    patch_service_status(namespace=namespace, service_name=service_name)
-    pass
+def services_requires_httproute(annotations: Box) -> bool:
+    return False
 
 
 def remove_httproute_for_service(
-    namespace: str, service_name: str, httproute_object_name_for_service: str
+    namespace: str, service_name: str, httproute_name: str
 ):
     try:
-        httproute = HTTPRoute.get(
-            name=httproute_object_name_for_service, namespace=namespace
-        )
+        httproute = HTTPRoute.get(name=httproute_name, namespace=namespace)
         httproute.delete()
         patch_service_status(
             namespace=namespace, service_name=service_name, mark_as_created=False
@@ -189,37 +321,47 @@ def remove_httproute_for_service(
         logger.error("EXCEPTION: {}".format(traceback.format_exc()))
 
 
+def create_http_route_from_annotations(
+    http_route_objects: HttpRouteObjects,
+    httproute_name: str,
+) -> bool:
+    return False
+
+
 def inspect_namespaced_service(
-    namespace: str,
-    service_name: str,
-    service_status: box.Box,
-    annotations: box.Box,
-    service_spec: box.Box,
+    service: Service,
 ):
-    httproute_object_name_for_service = "{}-route".format(service_name)
-    if (
-        was_httproute_created_for_service(
-            namespace=namespace,
-            service_name=service_name,
-            service_status=service_status,
-            httproute_object_name_for_service=httproute_object_name_for_service,
-        )
-        is False
-    ):
-        if services_requires_httproute(namespace, service_name, annotations) is True:
-            create_httproute_for_service(
-                namespace=namespace,
-                service_name=service_name,
-                httproute_object_name_for_service=httproute_object_name_for_service,
-                annoitations=annotations,
-                service_spec=service_spec,
+    namespace = "default"
+    if service.namespace is not None:
+        namespace = service.namespace
+    httproute_name = "{}-route".format(service.name)
+    httproute_objects = HttpRouteObjects(namespace=namespace)
+    httproute_required = services_requires_httproute(annotations=service.annotations)
+    httproute_exists = httproute_objects.exists(name=httproute_name)
+    if httproute_exists is False:
+        if httproute_required is True:
+            result = create_http_route_from_annotations(
+                http_route_objects=HttpRouteObjects(namespace=namespace),
+                httproute_name=httproute_name,
             )
+            if result is True:
+                logger.info(
+                    'Created HTTPRoute service named "{}" in namespace "{}"'.format(
+                        httproute_name, namespace
+                    )
+                )
+            else:
+                logger.error(
+                    'Attempt to create HTTPRoute object named "{}" for service "{}" in namespace "{}" FAILED.'.format(
+                        httproute_name, service.name, namespace
+                    )
+                )
     else:
-        if services_requires_httproute(namespace, service_name, annotations) is True:
+        if httproute_required is False:
             remove_httproute_for_service(
                 namespace=namespace,
-                service_name=service_name,
-                httproute_object_name_for_service=httproute_object_name_for_service,
+                service_name=service.name,
+                httproute_name=httproute_name,
             )
 
 
@@ -227,14 +369,7 @@ def run():
     while True:
         for service in kr8s.get("services", namespace=kr8s.ALL):
             if ignore_namespace(service.namespace) is False:
-                inspect_namespaced_service(
-                    namespace=service.namespace,
-                    service_name=service.name,
-                    service_status=service.status,
-                    httproute_objects=get_httproute_objects(service.namespace),
-                    annotations=service.annotations,
-                    service_spec=service.spec,
-                )
+                inspect_namespaced_service(service=service)
         time.sleep(15)
 
 
