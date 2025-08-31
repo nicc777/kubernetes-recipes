@@ -154,7 +154,7 @@ class HttpRouteObjects:
                             linked_service_name
                         )
                     logger.info(
-                        'Linked HTTPRoute named "{}" to service named "{}" in namespace "{}"'.format(
+                        'Found HTTPRoute named "{}" to service named "{}" in namespace "{}"'.format(
                             httproute_object.name, linked_service_name, self.namespace
                         )
                     )
@@ -171,6 +171,11 @@ class HttpRouteObjects:
         for n, o in self.httproute_objects.items():
             if o.namespace == self.namespace and o.name == name:
                 o.delete()
+                logger.info(
+                    'Deleted HTTPRoute named "{}" in namespace "{}"'.format(
+                        o.name, self.namespace
+                    )
+                )
         self.refresh_objects()
 
     def create(self, manifest: dict) -> bool:
@@ -188,6 +193,11 @@ class HttpRouteObjects:
                     return False
             new_object = object_from_spec(manifest, allow_unknown_type=True)
             new_object.create()
+            logger.info(
+                'Created HTTPRoute named "{}" in namespace "{}"'.format(
+                    new_object.name, self.namespace
+                )
+            )
         except:
             logger.error("EXCEPTION: {}".format(traceback.format_exc()))
             return False
@@ -195,7 +205,13 @@ class HttpRouteObjects:
         return True
 
     def names(self) -> tuple:
-        return tuple(self.httproute_objects.keys())
+        names = tuple(self.httproute_objects.keys())
+        logger.info(
+            "Found {} managed HTTPRoute objects in namespace {}".format(
+                len(names), self.namespace
+            )
+        )
+        return names
 
 
 def ignore_namespace(namespace: str) -> bool:
@@ -205,7 +221,7 @@ def ignore_namespace(namespace: str) -> bool:
         if must_ignore_name.endswith("*"):
             ignore_name_final = must_ignore_name.lower().split("*")[0]
             if namespace.lower().startswith(ignore_name_final) is True:
-                logger.warning(
+                logger.debug(
                     "Service created in namespace `{}` will be ignored...".format(
                         namespace
                     )
@@ -213,7 +229,7 @@ def ignore_namespace(namespace: str) -> bool:
                 return True
         else:
             if namespace.lower() == ignore_name_final:
-                logger.warning(
+                logger.debug(
                     "Service created in namespace `{}` will be ignored...".format(
                         namespace
                     )
@@ -227,62 +243,18 @@ def get_timestamp_as_str() -> str:
     return now_utc.isoformat().replace("+00:00", "Z")
 
 
-def get_current_service_status(service: Service) -> dict:
-    for condition in getattr(service.status, "conditions", list()):
-        # {'type': 'AutoHTTPRouteReady', 'status': 'True', 'lastTransitionTime': '2025-08-27T04:39:39Z', 'reason': 'provisioned', 'message': ''}
-        if getattr(condition, "type", "") == "AutoHTTPRoute":
-            return copy.deepcopy(condition)
-    return {
-        "type": "AutoHTTPRoute",
-        "status": "pending",
-        "reason": "waiting for reconciliation processing",
-        "message": "",
-        "lastTransitionTime": "unknown",
-        "lastProbeTime": get_timestamp_as_str(),
-    }
-
-
-def patch_service_status_last_probe_time(service: Service):
-    try:
-        now_as_iso_str = get_timestamp_as_str()
-        current_status_data = get_current_service_status(service=service)
-        last_transition_time = getattr(
-            current_status_data, "lastTransitionTime", "unknown"
-        )
-        if last_transition_time == "unknown":
-            last_transition_time = now_as_iso_str
-        patch_payload = {
-            "status": {
-                "conditions": [
-                    {
-                        "type": "AutoHTTPRouteReconciled",
-                        "status": getattr(current_status_data, "status", "True"),
-                        "reason": getattr(
-                            current_status_data, "reason", "Reconciliation Completed"
-                        ),
-                        "messagie": getattr(
-                            current_status_data, "message", "All actions performed"
-                        ),
-                        "lastTransitionTime": last_transition_time,
-                        "lastProbeTime": now_as_iso_str,
-                    }
-                ]
-            }
-        }
-        service.patch(patch_payload)
-        logger.info(
-            'Service "{}" in namespace "{}" status updated'.format(
-                service.name, service.namespace
-            )
-        )
-    except:
-        logger.error("EXCEPTION: {}".format(traceback.format_exc()))
-
-
-def get_namespaces() -> list:
+def get_namespaces(include_ignored_namespaces: bool = False) -> list:
     namespaces = list()
     for namespace in kr8s.get(kind="namespaces", namespace=kr8s.ALL):
-        namespaces.append(namespace.name)
+        if include_ignored_namespaces is True:
+            namespaces.append(namespace.name)
+        elif ignore_namespace(namespace=namespace.name) is False:
+            namespaces.append(namespace.name)
+    logger.info(
+        "Found {} namespaces (including ignored: {})".format(
+            len(namespaces), include_ignored_namespaces
+        )
+    )
     return namespaces
 
 
@@ -296,10 +268,66 @@ def calculate_name_based_on_keys(
     return name
 
 
+def build_httproute_manifest(
+    annotation_value_elements: list | tuple,
+    namespace: str,
+    service: Service,
+    original_value: str,
+    action: str,
+) -> dict:
+    manifest = HTTPROUTE_TEMPLATES["default"]
+    if action.lower() == "redirect":
+        manifest = HTTPROUTE_TEMPLATES["redirect"]
+    gateway_name = annotation_value_elements[0]
+    gateway_section_name = annotation_value_elements[1]
+    fqdn = annotation_value_elements[2]
+    target = annotation_value_elements[3]
+
+    httproute_name = calculate_name_based_on_keys(
+        input_keys=(
+            service.namespace,
+            service.name,
+            gateway_name,
+            gateway_section_name,
+            action,
+            target,
+        )
+    )
+    manifest["metadata"]["annotations"]["auto-httproute.linked-service-name"] = (
+        service.name
+    )
+    manifest["metadata"]["annotations"]["auto-httproute.action"] = action
+    manifest["metadata"]["annotations"]["auto-httproute.config-value"] = original_value
+    manifest_json = json.dumps(manifest)
+
+    manifest_json = manifest_json.replace("__NAME__", httproute_name)
+    manifest_json = manifest_json.replace("__NAMESPACE__", namespace)
+    manifest_json = manifest_json.replace("__GATEWAY_NAME__", gateway_name)
+    manifest_json = manifest_json.replace(
+        "__GATEWAY_SECTION_NAME__", gateway_section_name
+    )
+    manifest_json = manifest_json.replace("__FQDN__", fqdn)
+
+    if action.lower() != "redirect":
+        target = int(target)
+        manifest_json = manifest_json.replace("__SERVICE_NAME__", service.name)
+        manifest_json = manifest_json.replace("__SERVICE_TARGET_PORT__", str(target))
+    else:
+        manifest_json = manifest_json.replace("__GATEWAY_TARGET_SECTION_NAME__", target)
+
+    manifest = json.loads(manifest_json)
+    if action.lower() != "redirect":
+        logger.debug("manifest={}".format(json.dumps(manifest)))
+        manifest["spec"]["rules"][0]["backendRefs"][0]["port"] = int(
+            manifest["spec"]["rules"][0]["backendRefs"][0]["port"]
+        )
+    return manifest
+
+
 def get_required_httproutes_for_service(service: Service) -> dict:
     """
-    auto-httproute/<<custom-ref>>/target-port: <<gateway-name>>/<<section-name>>/<<fqdn>>/<<target-srevice-port>>
-    auto-httproute/<<custom-ref>>/redirect: <<gateway-name>>/<<section-name>>/<<fqdn>>/<<target-section-name>>
+    auto-httproute.<<custom-ref>>.target-port: <<gateway-name>>/<<section-name>>/<<fqdn>>/<<target-srevice-port>>
+    auto-httproute.<<custom-ref>>.redirect: <<gateway-name>>/<<section-name>>/<<fqdn>>/<<target-section-name>>
     """
     httproutes_required = dict()
     namespace = "default"
@@ -311,68 +339,17 @@ def get_required_httproutes_for_service(service: Service) -> dict:
             annotation_key_elements = k.split(".")
             if len(annotation_key_elements) > 2:
                 action = annotation_key_elements[2]
-                manifest = HTTPROUTE_TEMPLATES["default"]
-                if action.lower() == "redirect":
-                    manifest = HTTPROUTE_TEMPLATES["redirect"]
                 annotation_value_elements = v.split("/")
                 if len(annotation_value_elements) > 3:
-                    gateway_name = annotation_value_elements[0]
-                    gateway_section_name = annotation_value_elements[1]
-                    fqdn = annotation_value_elements[2]
-                    target = annotation_value_elements[3]
-
-                    httproute_name = calculate_name_based_on_keys(
-                        input_keys=(
-                            service.namespace,
-                            service.name,
-                            gateway_name,
-                            gateway_section_name,
-                            action,
-                            target,
-                        )
+                    manifest = build_httproute_manifest(
+                        annotation_value_elements=annotation_value_elements,
+                        namespace=namespace,
+                        service=service,
+                        original_value=v,
+                        action=action,
                     )
-                    manifest["metadata"]["annotations"][
-                        "auto-httproute.linked-service-name"
-                    ] = service.name
-                    manifest["metadata"]["annotations"]["auto-httproute.action"] = (
-                        action
-                    )
-                    manifest["metadata"]["annotations"][
-                        "auto-httproute.config-value"
-                    ] = v
-                    manifest_json = json.dumps(manifest)
 
-                    manifest_json = manifest_json.replace("__NAME__", httproute_name)
-                    manifest_json = manifest_json.replace("__NAMESPACE__", namespace)
-                    manifest_json = manifest_json.replace(
-                        "__GATEWAY_NAME__", gateway_name
-                    )
-                    manifest_json = manifest_json.replace(
-                        "__GATEWAY_SECTION_NAME__", gateway_section_name
-                    )
-                    manifest_json = manifest_json.replace("__FQDN__", fqdn)
-
-                    if action.lower() != "redirect":
-                        target = int(target)
-                        manifest_json = manifest_json.replace(
-                            "__SERVICE_NAME__", service.name
-                        )
-                        manifest_json = manifest_json.replace(
-                            "__SERVICE_TARGET_PORT__", str(target)
-                        )
-                    else:
-                        manifest_json = manifest_json.replace(
-                            "__GATEWAY_TARGET_SECTION_NAME__", target
-                        )
-
-                    manifest = json.loads(manifest_json)
-                    if action.lower() != "redirect":
-                        logger.debug("manifest={}".format(json.dumps(manifest)))
-                        manifest["spec"]["rules"][0]["backendRefs"][0]["port"] = int(
-                            manifest["spec"]["rules"][0]["backendRefs"][0]["port"]
-                        )
-
-                    httproutes_required[httproute_name] = manifest
+                    httproutes_required[manifest["metadata"]["name"]] = manifest
 
     return httproutes_required
 
@@ -389,7 +366,6 @@ def process(httproutes: HttpRouteObjects, service: Service) -> HttpRouteObjects:
     for required_name in required_names:
         if required_name not in current_names:
             httproutes.create(httproutes_required[required_name])
-    patch_service_status_last_probe_time(service=service)
     logger.info(
         'Service "{}" in namespace "{}" checked'.format(service.name, service.namespace)
     )
@@ -401,8 +377,16 @@ def run():
         for namespace in get_namespaces():
             if ignore_namespace(namespace=namespace) is False:
                 httproutes = HttpRouteObjects(namespace=namespace)
+                discovered_service_names = list()
                 for service in kr8s.get("services", namespace=namespace):
+                    discovered_service_names.append(service.name)
                     httproutes = process(httproutes=httproutes, service=service)
+                for (
+                    httproute_name,
+                    service_name,
+                ) in httproutes.httproute_service_links.items():
+                    if service_name not in discovered_service_names:
+                        httproutes.delete(name=httproute_name)
         time.sleep(15)
 
 

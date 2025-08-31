@@ -56,8 +56,8 @@ metadata:
     #
     # If neither of these annotations are present, any existing HTTPRoute with
     # a calculated target name will be deleted.
-    auto-httproute.<<custom-ref>>.target-port: <<gateway-name>>.<<section-name>>.<<fqdn>>.<<target-srevice-port>>
-    auto-httproute.<<custom-ref>>.redirect: <<gateway-name>>.<<section-name>>.<<fqdn>>.<<target-section-name>>
+    auto-httproute.<<custom-ref>>.target-port: <<gateway-name>>/<<section-name>>/<<fqdn>>/<<target-srevice-port>>
+    auto-httproute.<<custom-ref>>.redirect: <<gateway-name>>/<<section-name>>/<<fqdn>>/<<target-section-name>>
 ```
 
 By default, the following namespaces are excluded from the validation checks:
