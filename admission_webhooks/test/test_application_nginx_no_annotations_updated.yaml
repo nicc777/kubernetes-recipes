@@ -35,11 +35,8 @@ metadata:
   name: nginx-service
   namespace: test-app
   annotations:
-    auto-httproute/public-record-name: test-app
-    auto-httproute/service-target-port: "80"
-    auto-httproute/gateway-name: private-gateway
-    auto-httproute/gateway-http-section-name: http
-    auto-httproute/gateway-https-section-name: https
+    auto-httproute.1.redirect: private-gateway/http/test-app.toetzen.nl/https
+    auto-httproute.2.target-port: private-gateway/https/test-app.toetzen.nl/80
 spec:
   selector:
     app: nginx

@@ -51,30 +51,13 @@ The annotation on a `Service` object required to allow public access:
 ```yaml
 metadata:
   annotations:
-    #auto-httproute/expose-public: true # Default=false. If HTTPRoute objects link to this service, the deployment/update of this service will be denied. Also, new HTTPRoute objects will be denied.
-    #auto-httproute/public-record-name: test # [REQUIRED, if service is publicly exposed] 
-    #auto-httproute/service-target-port: 80 # [REQUIRED, is services have multiple port definitions] Indicate which is the HTTP port. Service HTTPS end-points are not yet supported.
-    #auto-httproute/skip-http-route-to-https-actions: false # Default=false. If true, the HTTPRoute object allowing HTTP traffic to the service will be allowed, otherwise a redirect to HTTP will be enforced
-    #auto-httproute/skip-mutation: false # Default=false. If set to true, the mutating web hook will not create HTTPRoute objects. Set this to true if you are providing your own HTTPRoute manifests.
-    #auto-httproute/gateway-name: private-gateway # Default=private-gateway
-    #access-modesauto-httproute/gateway-http-section-name: http # Default=http
-    #auto-httproute/gateway-https-section-name: https # Default=https
-    #auto-httproute/domain-name: null # [REQUIRED, if service is publicly exposed] add the domain name, for example "example.com". The final hostname will therefore be "test.example.com" (based on the public record name annotation.)
-
     # Choose EITHER "target-port" or "redirect" - NEVER BOTH. Both supplied
-    # will lead to no actions been taken
-    #
-    # If not supplied, the "target-route" option will be assumed, targeting
-    # either the lowest port in the service, or if any of these are present,
-    # the first one that matches: 80,8000-8999
+    # will lead to potential routing errors that can be hard to resolve.
     #
     # If neither of these annotations are present, any existing HTTPRoute with
     # a calculated target name will be deleted.
-    auto-httproute/<<gateway-name>>/<<section-name>>/target-port: 80
-    auto-httproute/<<gateway-name>>/<<section-name>>/redirect: <<target-section-name>> # Redirect, for example port 80 (http) to 443 (https) 
-
-    # REQUIRED if either of the previous two options were supplied. Ignored otherwise.
-    auto-httproute/<<gateway-name>>/<<section-name>>/fqdn: test.example.com
+    auto-httproute.<<custom-ref>>.target-port: <<gateway-name>>.<<section-name>>.<<fqdn>>.<<target-srevice-port>>
+    auto-httproute.<<custom-ref>>.redirect: <<gateway-name>>.<<section-name>>.<<fqdn>>.<<target-section-name>>
 ```
 
 By default, the following namespaces are excluded from the validation checks:
