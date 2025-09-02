@@ -87,7 +87,7 @@ spec:
           rules:
           - apiGroups:   [""]
             apiVersions: ["v1", "gateway.networking.k8s.io/v1"]
-            operations:  ["CREATE", "UPDATE", "DELETE"]
+            operations:  ["CREATE", "UPDATE"]
             resources:   ["httproutes"]
           clientConfig:
             service:
@@ -119,7 +119,7 @@ spec:
           rules:
           - apiGroups:   [""]
             apiVersions: ["v1", "gateway.networking.k8s.io/v1"]
-            operations:  ["CREATE", "UPDATE", "DELETE"]
+            operations:  ["CREATE", "UPDATE"]
             resources:   ["httproutes"]
           failurePolicy: Fail
           sideEffects: None
