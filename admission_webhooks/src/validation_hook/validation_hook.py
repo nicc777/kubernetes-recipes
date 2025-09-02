@@ -1,12 +1,12 @@
-import json
 import copy
 import os
 from datetime import datetime, timezone
 import traceback
 import uuid
 import socket
+import json
 
-from fastapi import FastAPI, HTTPException, responses
+from fastapi import FastAPI
 
 app = FastAPI()
 
@@ -75,6 +75,33 @@ class Logger:
 logger = Logger()
 logger.info("READY")
 logger.debug("Debug Enabled")
+
+
+class Policy:
+    def __init__(self, name: str = "Base Policy") -> None:
+        self.name = name
+
+    def allow(self, data: dict) -> bool:
+        return False
+
+
+class StrictNoUnmanagedHTTPRoutes(Policy):
+    def __init__(self) -> None:
+        super().__init__("strict-no-unmanaged-httproutes")
+
+    def allow(self, data: dict) -> bool:
+        try:
+            for k in tuple(data["annotations"].keys()):
+                if k.lower().startswith("auto-httproute.linked-service-name") is True:
+                    return True
+        except:
+            logger.error("EXCEPTION: {}".format(traceback.format_exc()))
+        return False
+
+
+policies = {
+    "strict-no-unmanaged-httproutes": StrictNoUnmanagedHTTPRoutes(),
+}
 
 
 def is_resolvable(fqdn: str, request_id: str = "no-request-id") -> bool:
@@ -201,6 +228,13 @@ def get_uid(data: dict) -> str:
         return ""
 
 
+def get_policy() -> Policy:
+    policy = Policy()
+    if POLICY_STRATEGY in policies:
+        policy = policies[POLICY_STRATEGY]
+    return policy
+
+
 @app.get("/")
 def root():
     return {"message": "ok"}
@@ -209,7 +243,11 @@ def root():
 @app.post("/validate")
 def post_validate(data: dict):
     request_id = str(uuid.uuid4())
+    logger.debug("Raw Input data: {}".format(json.dumps(data, indent=4)), request_id)
     object_data = get_request_object_data(data=data)
+    logger.debug(
+        "Validated data: {}".format(json.dumps(object_data, indent=4)), request_id
+    )
     uid = get_uid(data=data)
     warnings = None
     try:
@@ -246,13 +284,19 @@ def post_validate(data: dict):
                 warnings=warnings,
             )
 
-        annotations_check_passed = False
-        for k in tuple(object_data["annotations"].keys()):
-            if k.lower().startswith("auto-httproute.linked-service-name") is True:
-                annotations_check_passed = True
+        policy = get_policy()
+        logger.info(
+            "Evaluating {} object named {} in namespace {} against policy {}".format(
+                object_data["kind"],
+                object_data["name"],
+                object_data["namespace"],
+                policy.name,
+            ),
+            request_id,
+        )
 
-        # TODO: Still need to add various policy logic - for now, just a simple check...
-        if annotations_check_passed is True:
+        if policy.allow(data=object_data) is True:
+            logger.info("ALLOWED by policy", request_id)
             return build_response(
                 uid=uid,
                 validation_result=True,
@@ -261,10 +305,13 @@ def post_validate(data: dict):
                 warnings=warnings,
             )
         else:
+            logger.info("DENIED by policy", request_id)
             return build_response(
                 uid=uid,
                 validation_result=False,
-                validation_failed_reason="Not allowed by policy",
+                validation_failed_reason="Not allowed by policy [Policy: {}]".format(
+                    policy.name
+                ),
                 message="",
                 warnings=warnings,
             )
