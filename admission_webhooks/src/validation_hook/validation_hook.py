@@ -81,7 +81,7 @@ class Policy:
     def __init__(self, name: str = "Base Policy") -> None:
         self.name = name
 
-    def allow(self, data: dict) -> bool:
+    def allow(self, data: dict, request_id: str = "no-request-id-available") -> bool:
         return False
 
 
@@ -89,13 +89,21 @@ class StrictNoUnmanagedHTTPRoutes(Policy):
     def __init__(self) -> None:
         super().__init__("strict-no-unmanaged-httproutes")
 
-    def allow(self, data: dict) -> bool:
+    def allow(self, data: dict, request_id: str = "no-request-id-available") -> bool:
         try:
+            logger.info(
+                "Applying policy '{}' to {} with name '{}' in namespace '{}'".format(
+                    self.name, data["kind"], data["name"], data["namespace"]
+                ),
+                request_id,
+            )
             for k in tuple(data["annotations"].keys()):
                 if k.lower().startswith("auto-httproute.linked-service-name") is True:
+                    logger.info("ALLOW", request_id)
                     return True
         except:
             logger.error("EXCEPTION: {}".format(traceback.format_exc()))
+        logger.error("DENY", request_id)
         return False
 
 
