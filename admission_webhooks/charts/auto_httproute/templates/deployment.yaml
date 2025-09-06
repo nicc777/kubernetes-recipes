@@ -166,6 +166,7 @@ spec:
       labels:
         app: {{ .Chart.Name }}-controller
     spec:
+      serviceAccountName: auto-httroute-sa
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
