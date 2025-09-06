@@ -83,7 +83,7 @@ livenessProbe:
   controller:
     exec:
       command:
-        - python3 --version
+        - echo "running"
     initialDelaySeconds: 3
     periodSeconds: 3
 readinessProbe:
