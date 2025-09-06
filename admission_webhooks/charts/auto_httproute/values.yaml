@@ -83,7 +83,7 @@ livenessProbe:
   controller:
     exec:
       command:
-        - echo "running"
+        - pip --version
     initialDelaySeconds: 3
     periodSeconds: 3
 readinessProbe:
@@ -96,7 +96,7 @@ readinessProbe:
   controller:
     exec:
       command:
-        - echo "running"
+        - pip --version
     initialDelaySeconds: 3
     periodSeconds: 3
 
