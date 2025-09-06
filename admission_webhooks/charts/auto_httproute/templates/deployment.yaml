@@ -34,11 +34,11 @@ spec:
           - name: http
             containerPort: {{ .Values.service.port }}
             protocol: TCP
-          {{- with .Values.livenessProbe }}
+          {{- with .Values.livenessProbe.webhooks }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.readinessProbe }}
+          {{- with .Values.readinessProbe.webhooks }}
           readinessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -46,13 +46,13 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if gt ( int .Values.applicationSettings.tlsEnabled ) 0 }}
+          {{- if gt ( int .Values.applicationSettings.webhooks.tlsEnabled ) 0 }}
             {{- with .Values.tlsVolumeMounts }}
               {{- toYaml . | nindent 10 }}
             {{- end }}
           {{- end }}
           env:
-          {{- with .Values.applicationSettings }}
+          {{- with .Values.applicationSettings.webhooks }}
           - name: SSL_CERTIFICATE_FILE
             value: {{ .tlsCertificateFile }}
           - name: SSL_KEY_FILE
@@ -65,10 +65,10 @@ spec:
           - name: PORT
             value: {{ .Values.service.port | quote }}
           - name: WORKERS
-            value: {{ .Values.applicationSettings.workers | quote }}
+            value: {{ .Values.applicationSettings.webhooks.workers | quote }}
           - name: DEBUG
-            value: {{ .Values.applicationSettings.debug | quote }}
-      {{- if gt ( int .Values.applicationSettings.tlsEnabled ) 0 }}
+            value: {{ .Values.applicationSettings.webhooks.debug | quote }}
+      {{- if gt ( int .Values.applicationSettings.webhooks.tlsEnabled ) 0 }}
         {{- with .Values.tlsVolumes }}
           {{- toYaml . | nindent 6 }}
         {{- end }}
@@ -110,11 +110,11 @@ spec:
           - name: http
             containerPort: {{ .Values.service.port }}
             protocol: TCP
-          {{- with .Values.livenessProbe }}
+          {{- with .Values.livenessProbe.webhooks }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.readinessProbe }}
+          {{- with .Values.readinessProbe.webhooks }}
           readinessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -122,13 +122,13 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if gt ( int .Values.applicationSettings.tlsEnabled ) 0 }}
+          {{- if gt ( int .Values.applicationSettings.webhooks.tlsEnabled ) 0 }}
             {{- with .Values.tlsVolumeMounts }}
               {{- toYaml . | nindent 10 }}
             {{- end }}
           {{- end }}
           env:
-          {{- with .Values.applicationSettings }}
+          {{- with .Values.applicationSettings.webhooks }}
           - name: SSL_CERTIFICATE_FILE
             value: {{ .tlsCertificateFile }}
           - name: SSL_KEY_FILE
@@ -141,11 +141,61 @@ spec:
           - name: PORT
             value: {{ .Values.service.port | quote }}
           - name: WORKERS
-            value: {{ .Values.applicationSettings.workers | quote }}
+            value: {{ .Values.applicationSettings.webhooks.workers | quote }}
           - name: DEBUG
-            value: {{ .Values.applicationSettings.debug | quote }}
-      {{- if gt ( int .Values.applicationSettings.tlsEnabled ) 0 }}
+            value: {{ .Values.applicationSettings.webhooks.debug | quote }}
+      {{- if gt ( int .Values.applicationSettings.webhooks.tlsEnabled ) 0 }}
         {{- with .Values.tlsVolumes }}
           {{- toYaml . | nindent 6 }}
         {{- end }}
       {{- end }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}-controller
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}-controller
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}-controller
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}-controller
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.controller.repository }}:{{ .Values.image.controller.tag }}"
+          imagePullPolicy: {{ .Values.image.controller.pullPolicy }}
+          {{- with .Values.livenessProbe.controller }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe.controller }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+          - name: DEBUG
+            value: {{ .Values.applicationSettings.controller.debug | quote }}
+          - name: POLICY_STRATEGY
+            value: {{ .Values.applicationSettings.controller.policyStrategy | quote }}

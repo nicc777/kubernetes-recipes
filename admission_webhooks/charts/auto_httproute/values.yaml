@@ -9,11 +9,15 @@ image:
   validationWebhook:
     repository: ghcr.io/nicc777/kubernetes-recipes/admission-validation-webhook
     pullPolicy: IfNotPresent
-    tag: "validation-webhook-r0.16"
+    tag: "validation-webhook-r0.17"
   mutationWebhook:
     repository: ghcr.io/nicc777/kubernetes-recipes/admission-mutation-webhook
     pullPolicy: IfNotPresent
-    tag: "mutation-webhook-r0.8"
+    tag: "mutation-webhook-r0.9"
+  controller:
+    repository: ghcr.io/nicc777/kubernetes-recipes/auto-httproute-controller
+    pullPolicy: IfNotPresent
+    tag: "ah-controller-r0.1"
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
@@ -50,11 +54,15 @@ service:
 
 # Application settings - will be applied to both web hook deployments
 applicationSettings:
-  tlsEnabled: 1
-  tlsKeyFile: /certs/tls.key
-  tlsCertificateFile: /certs/tls.crt
-  workers: "4"
-  debug: 0
+  webhooks:
+    tlsEnabled: 1
+    tlsKeyFile: /certs/tls.key
+    tlsCertificateFile: /certs/tls.crt
+    workers: "4"
+    debug: 0
+  controller:
+    debug: 0
+    policyStrategy: strict-no-unmanaged-httproutes
 
 resources:
   limits:
@@ -66,17 +74,31 @@ resources:
 
 # This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 livenessProbe:
-  tcpSocket:
-    port: 8443
-  initialDelaySeconds: 3
-  periodSeconds: 3
-  failureThreshold: 3
+  webhooks:
+    tcpSocket:
+      port: 8443
+    initialDelaySeconds: 3
+    periodSeconds: 3
+    failureThreshold: 3
+  controller:
+    exec:
+      command:
+        - python3 --version
+    initialDelaySeconds: 3
+    periodSeconds: 3
 readinessProbe:
-  tcpSocket:
-    port: 8443
-  initialDelaySeconds: 3
-  periodSeconds: 3
-  failureThreshold: 3
+  webhooks:
+    tcpSocket:
+      port: 8443
+    initialDelaySeconds: 3
+    periodSeconds: 3
+    failureThreshold: 3
+  controller:
+    exec:
+      command:
+        - python3 --version
+    initialDelaySeconds: 3
+    periodSeconds: 3
 
 tlsVolumeMounts:
   volumeMounts:

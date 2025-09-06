@@ -32,8 +32,11 @@ spec:
             helm:
               valuesObject:
                 applicationSettings:
-                  tlsEnabled: 1
-                  debug: 1
+                  webhooks:
+                    tlsEnabled: 1
+                    debug: 1
+                  controller:
+                    debug: 1
               skipCrds: false
               skipSchemaValidation: false
           destination:
