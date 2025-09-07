@@ -183,11 +183,12 @@ def build_response(
     validation_failed_reason: str = "Validation Failed",
     message: str = "Check the validation web hook logs for more information.",
     patch: str | None = None,
+    request_id: str = "none",
 ) -> dict:
     result = copy.deepcopy(RESPONSE_TEMPLATE)
     if patch is not None and validation_result is True:
         result = copy.deepcopy(RESPONSE_TEMPLATE_WITH_PATCHES)
-        result["response"]["patch"] = encode_dict_as_json_base64(data=add_label_patch())
+        result["response"]["patch"] = patch
     result["response"]["uid"] = uid
     result["response"]["allowed"] = validation_result
     if validation_result is False:
@@ -197,6 +198,8 @@ def build_response(
 
     if warnings is not None:
         result["response"]["warnings"] = warnings
+
+    logger.info("Final Response: {}".format(json.dumps(result, indent=4)), request_id)
     return result
 
 
@@ -220,10 +223,13 @@ def add_label_patch() -> dict:
     return {"op": "add", "path": "/metadata/labels/auto-httproute", "value": "true"}
 
 
-def encode_dict_as_json_base64(data: dict) -> str:
+def encode_dict_as_json_base64(data: dict, request_id: str = "none") -> str:
     json_string = json.dumps(data)
     base64_encoded_bytes = base64.b64encode(json_string.encode("utf-8"))
-    return base64_encoded_bytes.decode("utf-8")
+    result = base64_encoded_bytes.decode("utf-8")
+    logger.debug("Original Data : {}".format(json.dumps(data, indent=4)), request_id)
+    logger.debug("Patch Value   : {}".format(result), request_id)
+    return result
 
 
 @app.get("/")
@@ -248,6 +254,7 @@ def post_validate(data: dict):
                 validation_result=False,
                 validation_failed_reason="General annotation validation failure. Please check the validation webhook logs.",
                 message=object_data["error"],
+                request_id=request_id,
             )
         if len(object_data["warnings"]) > 0:
             warnings = object_data["warnings"]
@@ -264,6 +271,7 @@ def post_validate(data: dict):
                 validation_failed_reason="",
                 message="",
                 warnings=warnings,
+                request_id=request_id,
             )
 
         if ignore_namespace(object_data["namespace"], request_id=request_id) is True:
@@ -273,6 +281,7 @@ def post_validate(data: dict):
                 validation_failed_reason="",
                 message="",
                 warnings=warnings,
+                request_id=request_id,
             )
 
         return build_response(
@@ -281,7 +290,10 @@ def post_validate(data: dict):
             validation_failed_reason="",
             message="",
             warnings=warnings,
-            patch=encode_dict_as_json_base64(data=add_label_patch()),
+            patch=encode_dict_as_json_base64(
+                data=add_label_patch(), request_id=request_id
+            ),
+            request_id=request_id,
         )
 
     except:
@@ -291,4 +303,5 @@ def post_validate(data: dict):
             validation_result=False,
             validation_failed_reason="Validation process threw an exception",
             message="Please check the web hook logs for the exception stack trace",
+            request_id=request_id,
         )
