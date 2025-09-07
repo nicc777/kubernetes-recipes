@@ -13,7 +13,7 @@ image:
   mutationWebhook:
     repository: ghcr.io/nicc777/kubernetes-recipes/admission-mutation-webhook
     pullPolicy: IfNotPresent
-    tag: "mutation-webhook-r0.9"
+    tag: "mutation-webhook-r0.10"
   controller:
     repository: ghcr.io/nicc777/kubernetes-recipes/auto-httproute-controller
     pullPolicy: IfNotPresent
