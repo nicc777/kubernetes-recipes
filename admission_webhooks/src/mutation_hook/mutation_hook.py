@@ -219,11 +219,13 @@ def get_uid(data: dict) -> str:
         return ""
 
 
-def add_label_patch() -> dict:
-    return {"op": "replace", "path": "/metadata/labels/auto-httproute", "value": "true"}
+def add_label_patch() -> list:
+    return [
+        {"op": "replace", "path": "/metadata/labels/auto-httproute", "value": "true"},
+    ]
 
 
-def encode_dict_as_json_base64(data: dict, request_id: str = "none") -> str:
+def encode_dict_as_json_base64(data: dict | list, request_id: str = "none") -> str:
     json_string = json.dumps(data)
     base64_encoded_bytes = base64.b64encode(json_string.encode("utf-8"))
     result = base64_encoded_bytes.decode("utf-8")
