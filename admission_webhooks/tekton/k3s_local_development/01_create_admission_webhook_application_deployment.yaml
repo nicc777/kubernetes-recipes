@@ -87,11 +87,6 @@ spec:
           name: auto-httproute-validating-hook-configuration
         webhooks:
         - name: auto-httproute-validating-hook.example.com
-          rules:
-          - apiGroups:   ["gateway.networking.k8s.io"]
-            apiVersions: ["v1", "gateway.networking.k8s.io/v1"]
-            operations:  ["CREATE", "UPDATE"]
-            resources:   ["httproutes"]
           clientConfig:
             service:
               namespace: default
@@ -99,6 +94,11 @@ spec:
               path: /validate
               port: 8443
             caBundle: $CA_BUNDLE
+          rules:
+          - apiGroups:   ["gateway.networking.k8s.io"]
+            apiVersions: ["v1", "gateway.networking.k8s.io/v1"]
+            operations:  ["CREATE", "UPDATE"]
+            resources:   ["httproutes"]
           admissionReviewVersions: ["v1"]
           sideEffects: None
           timeoutSeconds: 5

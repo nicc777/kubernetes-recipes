@@ -220,7 +220,7 @@ def get_uid(data: dict) -> str:
 
 
 def add_label_patch() -> dict:
-    return {"op": "add", "path": "/metadata/labels/auto-httproute", "value": "true"}
+    return {"op": "replace", "path": "/metadata/labels/auto-httproute", "value": "true"}
 
 
 def encode_dict_as_json_base64(data: dict, request_id: str = "none") -> str:

@@ -29,6 +29,7 @@ spec:
           ports:
             - containerPort: 80
 ---
+# Add annotations to expose the service to the Internet
 apiVersion: v1
 kind: Service
 metadata:
