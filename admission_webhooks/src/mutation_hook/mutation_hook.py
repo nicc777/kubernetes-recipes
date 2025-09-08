@@ -240,23 +240,19 @@ def add_label_patch(data: dict = dict(), request_id: str = "none") -> list:
         operations.append({"op": "add", "path": "/metadata/labels", "value": {}})
     if label_exists(data=data, request_id=request_id) is False:
         operations.append(
-            [
-                {
-                    "op": "add",
-                    "path": "/metadata/labels/auto-httproute",
-                    "value": "true",
-                },
-            ]
+            {
+                "op": "add",
+                "path": "/metadata/labels/auto-httproute",
+                "value": "true",
+            },
         )
     else:
         operations.append(
-            [
-                {
-                    "op": "replace",
-                    "path": "/metadata/labels/auto-httproute",
-                    "value": "true",
-                },
-            ]
+            {
+                "op": "replace",
+                "path": "/metadata/labels/auto-httproute",
+                "value": "true",
+            },
         )
     return operations
 
