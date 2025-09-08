@@ -234,7 +234,7 @@ def label_exists(data: dict, request_id: str) -> bool:
     return False
 
 
-def add_label_patch(data: dict = dict(), request_id: str) -> list:
+def add_label_patch(data: dict = dict(), request_id: str = "none") -> list:
     op = "add"
     if label_exists(data=data, request_id=request_id) is True:
         op = "replace"
@@ -335,7 +335,8 @@ def post_validate(data: dict):
             message="",
             warnings=warnings,
             patch=encode_dict_as_json_base64(
-                data=add_label_patch(data=object_data, request_id=request_id), request_id=request_id
+                data=add_label_patch(data=object_data, request_id=request_id),
+                request_id=request_id,
             ),
             request_id=request_id,
         )
