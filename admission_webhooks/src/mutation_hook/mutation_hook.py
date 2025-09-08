@@ -232,6 +232,17 @@ def encode_dict_as_json_base64(data: dict, request_id: str = "none") -> str:
     return result
 
 
+def is_managed_by_auto_httproute(data: dict, request_id: str) -> bool:
+    if "annotations" in data:
+        keys = tuple(data["annotations"].keys())
+        if "auto-httproute.linked-service-name" in keys:
+            logger.info("This HTTPRoute Object is managed", request_id)
+            return True
+    else:
+        logger.warning("This HTTPRoute Object is UNMANAGED", request_id)
+    return False
+
+
 @app.get("/")
 def root():
     return {"message": "ok"}
@@ -275,6 +286,19 @@ def post_validate(data: dict):
             )
 
         if ignore_namespace(object_data["namespace"], request_id=request_id) is True:
+            return build_response(
+                uid=uid,
+                validation_result=True,
+                validation_failed_reason="",
+                message="",
+                warnings=warnings,
+                request_id=request_id,
+            )
+
+        if (
+            is_managed_by_auto_httproute(data=object_data, request_id=request_id)
+            is False
+        ):
             return build_response(
                 uid=uid,
                 validation_result=True,
