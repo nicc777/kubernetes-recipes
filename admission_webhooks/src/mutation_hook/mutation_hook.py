@@ -172,6 +172,10 @@ def get_request_object_data(data: dict) -> dict:
             object_data["annotations"] = data["request"]["object"]["metadata"][
                 "annotations"
             ]
+    object_data["labels"] = dict()
+    if "labels" in data["request"]["object"]["metadata"]:
+        if data["request"]["object"]["metadata"]["labels"] is not None:
+            object_data["labels"] = data["request"]["object"]["metadata"]["labels"]
 
     return object_data
 
@@ -219,9 +223,23 @@ def get_uid(data: dict) -> str:
         return ""
 
 
-def add_label_patch() -> list:
+def label_exists(data: dict, request_id: str) -> bool:
+    if "labels" in data:
+        keys = tuple(data["labels"].keys())
+        if "auto-httproute" in keys:
+            logger.info("This HTTPRoute Object already labeled", request_id)
+            return True
+    else:
+        logger.warning("This HTTPRoute Object is not yet labeled", request_id)
+    return False
+
+
+def add_label_patch(data: dict = dict(), request_id: str) -> list:
+    op = "add"
+    if label_exists(data=data, request_id=request_id) is True:
+        op = "replace"
     return [
-        {"op": "replace", "path": "/metadata/labels/auto-httproute", "value": "true"},
+        {"op": op, "path": "/metadata/labels/auto-httproute", "value": "true"},
     ]
 
 
@@ -317,7 +335,7 @@ def post_validate(data: dict):
             message="",
             warnings=warnings,
             patch=encode_dict_as_json_base64(
-                data=add_label_patch(), request_id=request_id
+                data=add_label_patch(data=object_data, request_id=request_id), request_id=request_id
             ),
             request_id=request_id,
         )
