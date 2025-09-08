@@ -235,12 +235,30 @@ def label_exists(data: dict, request_id: str) -> bool:
 
 
 def add_label_patch(data: dict = dict(), request_id: str = "none") -> list:
-    op = "add"
-    if label_exists(data=data, request_id=request_id) is True:
-        op = "replace"
-    return [
-        {"op": op, "path": "/metadata/labels/auto-httproute", "value": "true"},
-    ]
+    operations = list()
+    if len(data["labels"]) == 0:
+        operations.append({"op": "add", "path": "/metadata/labels", "value": {}})
+    if label_exists(data=data, request_id=request_id) is False:
+        operations.append(
+            [
+                {
+                    "op": "add",
+                    "path": "/metadata/labels/auto-httproute",
+                    "value": "true",
+                },
+            ]
+        )
+    else:
+        operations.append(
+            [
+                {
+                    "op": "replace",
+                    "path": "/metadata/labels/auto-httproute",
+                    "value": "true",
+                },
+            ]
+        )
+    return operations
 
 
 def encode_dict_as_json_base64(data: dict | list, request_id: str = "none") -> str:
