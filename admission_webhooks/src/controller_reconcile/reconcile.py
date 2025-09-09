@@ -37,6 +37,7 @@ HTTPROUTE_TEMPLATES = {
             "parentRefs": [
                 {
                     "name": "__GATEWAY_NAME__",
+                    "namespace": "__GATEWAY_NAMESPACE__",
                     "sectionName": "__GATEWAY_SECTION_NAME__",
                 }
             ],
@@ -66,7 +67,11 @@ HTTPROUTE_TEMPLATES = {
         },
         "spec": {
             "parentRefs": [
-                {"name": "__GATEWAY_NAME__", "sectionName": "__GATEWAY_SECTION_NAME__"}
+                {
+                    "name": "__GATEWAY_NAME__",
+                    "namespace": "__GATEWAY_NAMESPACE__",
+                    "sectionName": "__GATEWAY_SECTION_NAME__",
+                }
             ],
             "hostnames": ["__FQDN__"],
             "rules": [
@@ -264,7 +269,7 @@ def calculate_name_based_on_keys(
     raw_name = "/".join(input_keys)
     name = "{}-{}".format(prefix, hashlib.sha256(raw_name.encode("utf-8")).hexdigest())
     if len(name) > max_len:
-        name = name[0: max_len - 1]
+        name = name[0 : max_len - 1]
     return name
 
 
@@ -278,10 +283,17 @@ def build_httproute_manifest(
     manifest = HTTPROUTE_TEMPLATES["default"]
     if action.lower() == "redirect":
         manifest = HTTPROUTE_TEMPLATES["redirect"]
+
+    """
+                                                        0                1                     2          3             4
+    auto-httproute.<<custom-ref>>.target-port: <<gateway-name>>/<<gateway-namespace>>/<<section-name>>/<<fqdn>>/<<target-srevice-port>>
+    auto-httproute.<<custom-ref>>.redirect:    <<gateway-name>>/<<gateway-namespace>>/<<section-name>>/<<fqdn>>/<<target-section-name>>
+    """
     gateway_name = annotation_value_elements[0]
-    gateway_section_name = annotation_value_elements[1]
-    fqdn = annotation_value_elements[2]
-    target = annotation_value_elements[3]
+    gateway_namespace = annotation_value_elements[1]
+    gateway_section_name = annotation_value_elements[2]
+    fqdn = annotation_value_elements[3]
+    target = annotation_value_elements[4]
 
     httproute_name = calculate_name_based_on_keys(
         input_keys=(
@@ -303,6 +315,7 @@ def build_httproute_manifest(
     manifest_json = manifest_json.replace("__NAME__", httproute_name)
     manifest_json = manifest_json.replace("__NAMESPACE__", namespace)
     manifest_json = manifest_json.replace("__GATEWAY_NAME__", gateway_name)
+    manifest_json = manifest_json.replace("__GATEWAY_NAMESPACE__", gateway_namespace)
     manifest_json = manifest_json.replace(
         "__GATEWAY_SECTION_NAME__", gateway_section_name
     )
@@ -325,10 +338,6 @@ def build_httproute_manifest(
 
 
 def get_required_httproutes_for_service(service: Service) -> dict:
-    """
-    auto-httproute.<<custom-ref>>.target-port: <<gateway-name>>/<<section-name>>/<<fqdn>>/<<target-srevice-port>>
-    auto-httproute.<<custom-ref>>.redirect: <<gateway-name>>/<<section-name>>/<<fqdn>>/<<target-section-name>>
-    """
     httproutes_required = dict()
     namespace = "default"
     if service.namespace is not None:

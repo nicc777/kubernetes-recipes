@@ -102,7 +102,7 @@ class StrictNoUnmanagedHTTPRoutes(Policy):
                     logger.info("ALLOW", request_id)
                     return True
         except:
-            logger.error("EXCEPTION: {}".format(traceback.format_exc()))
+            logger.error("EXCEPTION: {}".format(traceback.format_exc()), request_id)
         logger.error("DENY", request_id)
         return False
 
@@ -303,7 +303,7 @@ def post_validate(data: dict):
             request_id,
         )
 
-        if policy.allow(data=object_data) is True:
+        if policy.allow(data=object_data, request_id=request_id) is True:
             logger.info("ALLOWED by policy", request_id)
             return build_response(
                 uid=uid,
