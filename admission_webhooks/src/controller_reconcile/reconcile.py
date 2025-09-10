@@ -3,12 +3,11 @@ import time
 from datetime import datetime, timezone
 import json
 import traceback
-import copy
 import hashlib
 
 import kr8s
 from kr8s.objects import new_class, object_from_spec
-from kr8s.objects import Service, APIObject
+from kr8s.objects import Service, APIObject, Namespace
 
 
 NAMESPACE_NAMES_TO_IGNORE = [
@@ -22,6 +21,24 @@ NAMESPACE_NAMES_TO_IGNORE = [
     "nginx-gateway",
     "tekton-*",
 ]
+
+
+QUALIFYING_NAMESPACES = ["test-*", "prod-*"]
+
+
+QUALIFYING_NAMESPACE_LABELS = {
+    "shared-gateway-access": "true",
+}
+
+
+ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS = False
+if os.getenv("ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS", "1").lower()[0] in (
+    "1",
+    "t",
+    "e",
+    "o",
+):  # 1, true, enabled, on/ok
+    ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS = True
 
 
 HTTPROUTE_TEMPLATES = {
@@ -243,6 +260,85 @@ def ignore_namespace(namespace: str) -> bool:
     return False
 
 
+def get_namespace_labels(namespace: str) -> dict:
+    labels = dict()
+    ns = Namespace.get(namespace)
+    for label_name, label_value in ns.labels.items():
+        labels[label_name] = "{}".format(label_value)
+    return labels
+
+
+def namespace_has_qualifying_labels(namespace: str, current_labels: dict) -> bool:
+    for q_name, q_value in QUALIFYING_NAMESPACE_LABELS.items():
+        match_found = False
+        if q_name in current_labels:
+            if q_value == current_labels[q_name]:
+                match_found = True
+            else:
+                logger.error(
+                    'Namespace "{}" found qualifying label  "{}", but expected value "{}" did not match current value "{}"'.format(
+                        namespace, q_name, q_value, current_labels[q_name]
+                    )
+                )
+                return False
+        if (
+            match_found is False
+            and ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS is True
+        ):
+            namespace_obj = Namespace.get(namespace)
+            namespace_obj.label({q_name: q_value})
+            logger.info(
+                'Qualifying namespace "{}" was missing label "{}: {}" - label dynamically added as a reqult of the environment value ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS is set to 1'.format(
+                    namespace, q_name, q_value
+                )
+            )
+        else:
+            logger.error(
+                'Namespace "{}" missing qualifying label  "{}: {}"'.format(
+                    namespace, q_name, q_value
+                )
+            )
+            return False
+    return False
+
+
+def namespace_qualifies(namespace: str) -> bool:
+    test_phase1_qty_passed = 0
+    test_phase1_qty_tests = len(QUALIFYING_NAMESPACE_LABELS)
+    for ns in QUALIFYING_NAMESPACES:
+        ns_pattern = ns.lower()
+        if ns_pattern.endswith("*"):
+            include_name_final = ns_pattern.lower().split("*")[0]
+            if namespace.lower().startswith(include_name_final) is True:
+                logger.debug(
+                    "Service created in namespace `{}` matches qualifying criteria...".format(
+                        namespace
+                    )
+                )
+                test_phase1_qty_passed += 1
+            else:
+                if namespace.lower() == include_name_final:
+                    logger.debug(
+                        "Service created in namespace `{}` matches qualifying criteria...".format(
+                            namespace
+                        )
+                    )
+                    test_phase1_qty_passed += 1
+    if test_phase1_qty_passed >= test_phase1_qty_tests:
+        if (
+            namespace_has_qualifying_labels(
+                namespace=namespace, current_labels=get_namespace_labels(namespace)
+            )
+            is True
+        ):
+            logger.info(
+                "Service created in namespace `{}` qualifies...".format(namespace)
+            )
+            return True
+    logger.info("Service created in namespace `{}` does NOT qualify".format(namespace))
+    return False
+
+
 def get_timestamp_as_str() -> str:
     now_utc = datetime.now(tz=timezone.utc)
     return now_utc.isoformat().replace("+00:00", "Z")
@@ -385,17 +481,18 @@ def run():
     while True:
         for namespace in get_namespaces():
             if ignore_namespace(namespace=namespace) is False:
-                httproutes = HttpRouteObjects(namespace=namespace)
-                discovered_service_names = list()
-                for service in kr8s.get("services", namespace=namespace):
-                    discovered_service_names.append(service.name)
-                    httproutes = process(httproutes=httproutes, service=service)
-                for (
-                    httproute_name,
-                    service_name,
-                ) in httproutes.httproute_service_links.items():
-                    if service_name not in discovered_service_names:
-                        httproutes.delete(name=httproute_name)
+                if namespace_qualifies(namespace=namespace) is True:
+                    httproutes = HttpRouteObjects(namespace=namespace)
+                    discovered_service_names = list()
+                    for service in kr8s.get("services", namespace=namespace):
+                        discovered_service_names.append(service.name)
+                        httproutes = process(httproutes=httproutes, service=service)
+                    for (
+                        httproute_name,
+                        service_name,
+                    ) in httproutes.httproute_service_links.items():
+                        if service_name not in discovered_service_names:
+                            httproutes.delete(name=httproute_name)
         time.sleep(15)
 
 
