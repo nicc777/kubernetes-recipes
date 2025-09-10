@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: auto-httproute-sa
-  namespace: { { .Values.namespace } }
+  namespace: {{ .Values.namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -37,7 +37,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: auto-httproute-sa
-    namespace: { { .Values.namespace } }
+    namespace: {{ .Values.namespace }}
 roleRef:
   kind: ClusterRole
   name: auto-httproute-cr
