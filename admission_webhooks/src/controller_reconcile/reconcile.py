@@ -269,6 +269,7 @@ def get_namespace_labels(namespace: str) -> dict:
 
 
 def namespace_has_qualifying_labels(namespace: str, current_labels: dict) -> bool:
+    # CHECK AND ADD LABELS IF REQUIRED
     for q_name, q_value in QUALIFYING_NAMESPACE_LABELS.items():
         match_found = False
         if q_name in current_labels:
@@ -292,14 +293,21 @@ def namespace_has_qualifying_labels(namespace: str, current_labels: dict) -> boo
                     namespace, q_name, q_value
                 )
             )
-        else:
+    # VALIDATE
+    for q_name, q_value in QUALIFYING_NAMESPACE_LABELS.items():
+        if q_name not in current_labels:
             logger.error(
                 'Namespace "{}" missing qualifying label  "{}: {}"'.format(
                     namespace, q_name, q_value
                 )
             )
+            logger.info(
+                "Environment variable ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS={}".format(
+                    ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS
+                )
+            )
             return False
-    return False
+    return True
 
 
 def namespace_qualifies(namespace: str) -> bool:
