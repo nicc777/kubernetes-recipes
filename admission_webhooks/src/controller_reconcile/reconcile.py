@@ -115,17 +115,27 @@ if os.getenv("DEBUG", "0").lower()[0] in (
 
 class Logger:
     def info(self, message):
-        print("{} - [INFO] {}".format(datetime.now(tz=timezone.utc), message))
+        print(
+            "{} - [INFO] {}".format(datetime.now(tz=timezone.utc), message), flush=True
+        )
 
     def debug(self, message):
         if debug is True:
-            print("{} - [DEBUG] {}".format(datetime.now(tz=timezone.utc), message))
+            print(
+                "{} - [DEBUG] {}".format(datetime.now(tz=timezone.utc), message),
+                flush=True,
+            )
 
     def error(self, message):
-        print("{} - [ERROR] {}".format(datetime.now(tz=timezone.utc), message))
+        print(
+            "{} - [ERROR] {}".format(datetime.now(tz=timezone.utc), message), flush=True
+        )
 
     def warning(self, message):
-        print("{} - [WARNING] {}".format(datetime.now(tz=timezone.utc), message))
+        print(
+            "{} - [WARNING] {}".format(datetime.now(tz=timezone.utc), message),
+            flush=True,
+        )
 
 
 logger = Logger()
