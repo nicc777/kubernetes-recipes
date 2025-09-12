@@ -228,11 +228,11 @@ class HttpRouteObjects:
 
     def names(self) -> tuple:
         names = tuple(self.httproute_objects.keys())
-        logger.info(
-            "Found {} managed HTTPRoute objects in namespace {}".format(
-                len(names), self.namespace
-            )
-        )
+        # logger.info(
+        #     "Found {} managed HTTPRoute objects in namespace {}".format(
+        #         len(names), self.namespace
+        #     )
+        # )
         return names
 
 
@@ -359,11 +359,11 @@ def get_namespaces(include_ignored_namespaces: bool = False) -> list:
             namespaces.append(namespace.name)
         elif ignore_namespace(namespace=namespace.name) is False:
             namespaces.append(namespace.name)
-    logger.info(
-        "Found {} namespaces (including ignored: {})".format(
-            len(namespaces), include_ignored_namespaces
-        )
-    )
+    # logger.info(
+    #     "Found {} namespaces (including ignored: {})".format(
+    #         len(namespaces), include_ignored_namespaces
+    #     )
+    # )
     return namespaces
 
 
