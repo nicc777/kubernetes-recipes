@@ -17,7 +17,7 @@ image:
   controller:
     repository: ghcr.io/nicc777/kubernetes-recipes/auto-httproute-controller
     pullPolicy: IfNotPresent
-    tag: "ah-controller-r0.5"
+    tag: "ah-controller-r0.6"
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
