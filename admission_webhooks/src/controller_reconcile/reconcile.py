@@ -237,25 +237,25 @@ class HttpRouteObjects:
 
 
 def ignore_namespace(namespace: str) -> bool:
-    logger.debug("Checking if namespace `{}` should be processed...".format(namespace))
+    # logger.debug("Checking if namespace `{}` should be processed...".format(namespace))
     for must_ignore_name in NAMESPACE_NAMES_TO_IGNORE:
         ignore_name_final = must_ignore_name.lower()
         if must_ignore_name.endswith("*"):
             ignore_name_final = must_ignore_name.lower().split("*")[0]
             if namespace.lower().startswith(ignore_name_final) is True:
-                logger.debug(
-                    "Service created in namespace `{}` will be ignored...".format(
-                        namespace
-                    )
-                )
+                # logger.debug(
+                #     "Service created in namespace `{}` will be ignored...".format(
+                #         namespace
+                #     )
+                # )
                 return True
         else:
             if namespace.lower() == ignore_name_final:
-                logger.debug(
-                    "Service created in namespace `{}` will be ignored...".format(
-                        namespace
-                    )
-                )
+                # logger.debug(
+                #     "Service created in namespace `{}` will be ignored...".format(
+                #         namespace
+                #     )
+                # )
                 return True
     return False
 
@@ -487,6 +487,10 @@ def process(httproutes: HttpRouteObjects, service: Service) -> HttpRouteObjects:
 
 def run():
     while True:
+        logger.info(
+            "Explicitly Ignored Namespaces: {}".format(NAMESPACE_NAMES_TO_IGNORE)
+        )
+        logger.info("Qualifying Namespaces: {}".format(QUALIFYING_NAMESPACES))
         for namespace in get_namespaces():
             if ignore_namespace(namespace=namespace) is False:
                 if namespace_qualifies(namespace=namespace) is True:
