@@ -342,7 +342,7 @@ def post_validate(data: dict):
                 message=object_data["error"],
                 request_id=request_id,
             )
-        if object_data["kind"] != "namespace":
+        if object_data["kind"] == "namespace":
             if ignore_namespace(namespace=object_data["namespace"]) is False:
                 qualified_namespace_patches = get_qualified_namespace_patches(
                     namespace=object_data["namespace"], object_data=object_data
