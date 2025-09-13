@@ -362,7 +362,7 @@ def post_validate(data: dict):
                         uid=uid,
                         validation_result=True,
                         validation_failed_reason="",
-                        message=object_data["error"],
+                        message="",
                         request_id=request_id,
                         patch=encode_dict_as_json_base64(
                             data=operations, request_id=request_id
