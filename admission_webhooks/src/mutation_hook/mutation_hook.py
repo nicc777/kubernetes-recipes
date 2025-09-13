@@ -230,7 +230,7 @@ def get_request_object_data(data: dict) -> dict:
 
     object_data["kind"] = data["request"]["object"]["kind"].lower()
     object_data["name"] = data["request"]["object"]["metadata"]["name"]
-    object_data["namespace"] = data["request"]["object"]["metadata"]["namespace"]
+    object_data["namespace"] = data["request"]["namespace"]
     object_data["annotations"] = dict()
     if "annotations" in data["request"]["object"]["metadata"]:
         if data["request"]["object"]["metadata"]["annotations"] is not None:
