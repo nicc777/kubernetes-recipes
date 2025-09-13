@@ -264,11 +264,11 @@ def build_response(
         return result
     if patch is not None and validation_result is True:
         result = copy.deepcopy(RESPONSE_TEMPLATE_WITH_PATCHES)
-        result["response"]["uid"] = uid
-        result["response"]["allowed"] = validation_result
         result["response"]["patch"] = patch
     if warnings is not None:
         result["response"]["warnings"] = warnings
+    result["response"]["uid"] = uid
+    result["response"]["allowed"] = validation_result
     logger.info("Final Response: {}".format(json.dumps(result, indent=4)), request_id)
     return result
 
@@ -334,6 +334,7 @@ def post_validate(data: dict):
     warnings = None
     try:
         if "error" in object_data:
+            logger.error("Validation Error", request_id)
             return build_response(
                 uid=uid,
                 validation_result=False,
@@ -371,6 +372,16 @@ def post_validate(data: dict):
                     logger.info(
                         'No patches for namespace "{}"'.format(object_data["namespace"])
                     )
+            else:
+                logger.info(
+                    "Ignoring namespace: {}".format(object_data["namespace"]),
+                    request_id,
+                )
+        else:
+            logger.error(
+                "Not a namespace kind. Parsed type: {}".format(object_data["kind"]),
+                request_id,
+            )
 
         return build_response(
             uid=uid,
