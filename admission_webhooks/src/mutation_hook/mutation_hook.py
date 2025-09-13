@@ -9,7 +9,40 @@ import base64
 
 from fastapi import FastAPI
 
+from kr8s.objects import Namespace
+
 app = FastAPI()
+
+
+NAMESPACE_NAMES_TO_IGNORE = [
+    "argocd",
+    "bootstrapping",
+    "cert-manager",
+    "default",
+    "devops",
+    "kube-*",
+    "nfs",
+    "nginx-gateway",
+    "tekton-*",
+]
+
+
+QUALIFYING_NAMESPACES = ["test-*", "prod-*"]
+
+
+QUALIFYING_NAMESPACE_LABELS = {
+    "shared-gateway-access": "true",
+}
+
+
+ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS = False
+if os.getenv("ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS", "1").lower()[0] in (
+    "1",
+    "t",
+    "e",
+    "o",
+):  # 1, true, enabled, on/ok
+    ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS = True
 
 
 RESPONSE_TEMPLATE = {
@@ -29,17 +62,6 @@ RESPONSE_TEMPLATE_WITH_PATCHES = {
     },
 }
 
-NAMESPACE_NAMES_TO_IGNORE = [
-    "argocd",
-    "bootstrapping",
-    "cert-manager",
-    "default",
-    "devops",
-    "kube-*",
-    "nfs",
-    "nginx-gateway",
-    "tekton-*",
-]
 
 debug = False
 if os.getenv("DEBUG", "0").lower()[0] in (
@@ -97,32 +119,78 @@ def is_resolvable(fqdn: str, request_id: str = "no-request-id") -> bool:
 
 
 def ignore_namespace(namespace: str, request_id: str = "no-request-id") -> bool:
-    logger.debug(
-        "Checking if namespace `{}` should be processed...".format(namespace),
-        request_id,
-    )
     for must_ignore_name in NAMESPACE_NAMES_TO_IGNORE:
         ignore_name_final = must_ignore_name.lower()
         if must_ignore_name.endswith("*"):
             ignore_name_final = must_ignore_name.lower().split("*")[0]
             if namespace.lower().startswith(ignore_name_final) is True:
-                logger.debug(
-                    "Service created in namespace `{}` will be ignored...".format(
-                        namespace
-                    ),
-                    request_id,
-                )
                 return True
         else:
             if namespace.lower() == ignore_name_final:
-                logger.debug(
-                    "Service created in namespace `{}` will be ignored...".format(
-                        namespace
-                    ),
-                    request_id,
-                )
                 return True
     return False
+
+
+def get_namespace_patches(namespace: str, current_labels: dict) -> dict:
+    result = dict()
+    result["doPatch"] = False
+    result["patches"] = list()
+    # CHECK AND ADD LABELS IF REQUIRED
+    for q_name, q_value in QUALIFYING_NAMESPACE_LABELS.items():
+        match_found = False
+        if q_name in current_labels:
+            if q_value == current_labels[q_name]:
+                match_found = True
+            else:
+                logger.error(
+                    'Namespace "{}" found qualifying label  "{}", but expected value "{}" did not match current value "{}"'.format(
+                        namespace, q_name, q_value, current_labels[q_name]
+                    )
+                )
+                return result
+        if (
+            match_found is False
+            and ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS is True
+        ):
+            result["doPatch"] = True
+            result["patches"].append({q_name: q_value})
+            logger.info(
+                'Qualifying namespace "{}" was missing label "{}: {}" - label will be added as a reqult of the environment value ADD_QUALIFYING_NAMESPACE_LABELS_IF_NOT_EXISTS is set to 1'.format(
+                    namespace, q_name, q_value
+                )
+            )
+    return result
+
+
+def get_qualified_namespace_patches(namespace: str, object_data: dict) -> dict:
+    result = dict()
+    result["doPatch"] = False
+    result["patches"] = list()
+    namespace_qualifies = False
+    for ns in QUALIFYING_NAMESPACES:
+        ns_pattern = ns.lower()
+        if ns_pattern.endswith("*"):
+            include_name_final = ns_pattern.lower().split("*")[0]
+            if namespace.lower().startswith(include_name_final) is True:
+                logger.debug(
+                    "Service created in namespace `{}` matches qualifying criteria...".format(
+                        namespace
+                    )
+                )
+                namespace_qualifies = True
+            else:
+                if namespace.lower() == include_name_final:
+                    logger.debug(
+                        "Service created in namespace `{}` matches qualifying criteria...".format(
+                            namespace
+                        )
+                    )
+                namespace_qualifies = True
+    if namespace_qualifies is True:
+        result = get_namespace_patches(
+            namespace=namespace, current_labels=object_data["labels"]
+        )
+    return result
 
 
 def data_validation(data: dict | None) -> dict:
@@ -152,9 +220,6 @@ def data_validation(data: dict | None) -> dict:
         return {"error": "request.object.metadata key not present"}
     if "name" not in data["request"]["object"]["metadata"]:
         return {"error": "request.object.metadata.name key not present"}
-    if "namespace" not in data["request"]["object"]["metadata"]:
-        return {"error": "request.object.metadata.namespace key not present"}
-
     return object_data
 
 
@@ -190,19 +255,20 @@ def build_response(
     request_id: str = "none",
 ) -> dict:
     result = copy.deepcopy(RESPONSE_TEMPLATE)
-    if patch is not None and validation_result is True:
-        result = copy.deepcopy(RESPONSE_TEMPLATE_WITH_PATCHES)
-        result["response"]["patch"] = patch
-    result["response"]["uid"] = uid
-    result["response"]["allowed"] = validation_result
     if validation_result is False:
+        result["response"]["uid"] = uid
+        result["response"]["allowed"] = validation_result
         result["response"]["status"] = dict()
         result["response"]["status"]["code"] = 403
         result["response"]["status"]["message"] = validation_failed_reason
-
+        return result
+    if patch is not None and validation_result is True:
+        result = copy.deepcopy(RESPONSE_TEMPLATE_WITH_PATCHES)
+        result["response"]["uid"] = uid
+        result["response"]["allowed"] = validation_result
+        result["response"]["patch"] = patch
     if warnings is not None:
         result["response"]["warnings"] = warnings
-
     logger.info("Final Response: {}".format(json.dumps(result, indent=4)), request_id)
     return result
 
@@ -223,37 +289,22 @@ def get_uid(data: dict) -> str:
         return ""
 
 
-def label_exists(data: dict, request_id: str) -> bool:
-    if "labels" in data:
-        keys = tuple(data["labels"].keys())
-        if "auto-httproute" in keys:
-            logger.info("This HTTPRoute Object already labeled", request_id)
-            return True
-    else:
-        logger.warning("This HTTPRoute Object is not yet labeled", request_id)
-    return False
-
-
-def add_label_patch(data: dict = dict(), request_id: str = "none") -> list:
+def add_label_patch(
+    object_data: dict = dict(), label_patches: list = list(), request_id: str = "none"
+) -> list:
     operations = list()
-    if len(data["labels"]) == 0:
+    if len(object_data["labels"]) == 0 and len(label_patches) > 0:
         operations.append({"op": "add", "path": "/metadata/labels", "value": {}})
-    if label_exists(data=data, request_id=request_id) is False:
-        operations.append(
-            {
-                "op": "add",
-                "path": "/metadata/labels/auto-httproute",
-                "value": "true",
-            },
-        )
-    else:
-        operations.append(
-            {
-                "op": "replace",
-                "path": "/metadata/labels/auto-httproute",
-                "value": "true",
-            },
-        )
+
+    for label_patch_data in label_patches:
+        for k, v in label_patch_data.items():
+            operations.append(
+                {
+                    "op": "add",
+                    "path": "/metadata/labels/{}".format(k),
+                    "value": "{}".format(v),
+                },
+            )
     return operations
 
 
@@ -264,17 +315,6 @@ def encode_dict_as_json_base64(data: dict | list, request_id: str = "none") -> s
     logger.debug("Original Data : {}".format(json.dumps(data, indent=4)), request_id)
     logger.debug("Patch Value   : {}".format(result), request_id)
     return result
-
-
-def is_managed_by_auto_httproute(data: dict, request_id: str) -> bool:
-    if "annotations" in data:
-        keys = tuple(data["annotations"].keys())
-        if "auto-httproute.linked-service-name" in keys:
-            logger.info("This HTTPRoute Object is managed", request_id)
-            return True
-    else:
-        logger.warning("This HTTPRoute Object is UNMANAGED", request_id)
-    return False
 
 
 @app.get("/")
@@ -301,46 +341,36 @@ def post_validate(data: dict):
                 message=object_data["error"],
                 request_id=request_id,
             )
-        if len(object_data["warnings"]) > 0:
-            warnings = object_data["warnings"]
-        if object_data["kind"] != "httproute":
-            warnings = add_warning(
-                current_warnings=warnings,
-                warning_message="Kind {} ignored".format(
-                    data["request"]["object"]["kind"]
-                ),
-            )
-            return build_response(
-                uid=uid,
-                validation_result=True,
-                validation_failed_reason="",
-                message="",
-                warnings=warnings,
-                request_id=request_id,
-            )
-
-        if ignore_namespace(object_data["namespace"], request_id=request_id) is True:
-            return build_response(
-                uid=uid,
-                validation_result=True,
-                validation_failed_reason="",
-                message="",
-                warnings=warnings,
-                request_id=request_id,
-            )
-
-        if (
-            is_managed_by_auto_httproute(data=object_data, request_id=request_id)
-            is False
-        ):
-            return build_response(
-                uid=uid,
-                validation_result=True,
-                validation_failed_reason="",
-                message="",
-                warnings=warnings,
-                request_id=request_id,
-            )
+        if object_data["kind"] != "namespace":
+            if ignore_namespace(namespace=object_data["namespace"]) is False:
+                qualified_namespace_patches = get_qualified_namespace_patches(
+                    namespace=object_data["namespace"], object_data=object_data
+                )
+                if qualified_namespace_patches["doPatch"] is True:
+                    logger.info(
+                        'Namespace "{}" requires patching of labels'.format(
+                            object_data["namespace"]
+                        )
+                    )
+                    operations = add_label_patch(
+                        object_data=object_data,
+                        label_patches=qualified_namespace_patches["patches"],
+                        request_id=request_id,
+                    )
+                    return build_response(
+                        uid=uid,
+                        validation_result=True,
+                        validation_failed_reason="",
+                        message=object_data["error"],
+                        request_id=request_id,
+                        patch=encode_dict_as_json_base64(
+                            data=operations, request_id=request_id
+                        ),
+                    )
+                else:
+                    logger.info(
+                        'No patches for namespace "{}"'.format(object_data["namespace"])
+                    )
 
         return build_response(
             uid=uid,
@@ -348,10 +378,6 @@ def post_validate(data: dict):
             validation_failed_reason="",
             message="",
             warnings=warnings,
-            patch=encode_dict_as_json_base64(
-                data=add_label_patch(data=object_data, request_id=request_id),
-                request_id=request_id,
-            ),
             request_id=request_id,
         )
 

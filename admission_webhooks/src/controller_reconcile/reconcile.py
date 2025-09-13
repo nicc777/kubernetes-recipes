@@ -238,34 +238,18 @@ class HttpRouteObjects:
 
     def names(self) -> tuple:
         names = tuple(self.httproute_objects.keys())
-        # logger.info(
-        #     "Found {} managed HTTPRoute objects in namespace {}".format(
-        #         len(names), self.namespace
-        #     )
-        # )
         return names
 
 
 def ignore_namespace(namespace: str) -> bool:
-    # logger.debug("Checking if namespace `{}` should be processed...".format(namespace))
     for must_ignore_name in NAMESPACE_NAMES_TO_IGNORE:
         ignore_name_final = must_ignore_name.lower()
         if must_ignore_name.endswith("*"):
             ignore_name_final = must_ignore_name.lower().split("*")[0]
             if namespace.lower().startswith(ignore_name_final) is True:
-                # logger.debug(
-                #     "Service created in namespace `{}` will be ignored...".format(
-                #         namespace
-                #     )
-                # )
                 return True
         else:
             if namespace.lower() == ignore_name_final:
-                # logger.debug(
-                #     "Service created in namespace `{}` will be ignored...".format(
-                #         namespace
-                #     )
-                # )
                 return True
     return False
 
@@ -369,11 +353,6 @@ def get_namespaces(include_ignored_namespaces: bool = False) -> list:
             namespaces.append(namespace.name)
         elif ignore_namespace(namespace=namespace.name) is False:
             namespaces.append(namespace.name)
-    # logger.info(
-    #     "Found {} namespaces (including ignored: {})".format(
-    #         len(namespaces), include_ignored_namespaces
-    #     )
-    # )
     return namespaces
 
 

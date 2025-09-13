@@ -120,10 +120,10 @@ spec:
               port: 8443
             caBundle: $CA_BUNDLE
           rules:
-          - apiGroups:   ["gateway.networking.k8s.io"]
-            apiVersions: ["v1", "gateway.networking.k8s.io/v1"]
+          - apiGroups:   [""]
+            apiVersions: ["v1"]
             operations:  ["CREATE", "UPDATE"]
-            resources:   ["httproutes"]
+            resources:   ["namespaces"]
           failurePolicy: Fail
           sideEffects: None
           admissionReviewVersions: ["v1"]
