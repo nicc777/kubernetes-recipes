@@ -1,0 +1,213 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.1.1 Chrome/132.0.6834.210 Electron/34.3.3 Safari/537.36" version="26.1.1" pages="2">
+  <diagram name="Reconciliation Logic" id="kgXctAJIjnvpyNQdN7ng">
+    <mxGraphModel dx="1839" dy="576" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-1" target="eDp1Fgec7gKsBe5Jd8jF-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-1" value="Main Loop" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.start_1;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="290" y="190" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-2" target="eDp1Fgec7gKsBe5Jd8jF-7">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="290" y="420.0000000000001" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-2" value="Get all namespaces" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="240" y="320" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-5" value="Get Next namespace in list" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="240" y="540" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-8" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-7" target="eDp1Fgec7gKsBe5Jd8jF-5">
+          <mxGeometry x="-0.6667" y="20" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-10" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-7" target="eDp1Fgec7gKsBe5Jd8jF-9">
+          <mxGeometry x="-0.7143" y="10" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-7" value="Are there more namespaces to process?" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;spacingLeft=5;spacingRight=5;" vertex="1" parent="1">
+          <mxGeometry x="270" y="400" width="140" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-9" target="eDp1Fgec7gKsBe5Jd8jF-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="100" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-9" value="Sleep (15 seconds)" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry y="430" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-14" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-12" target="eDp1Fgec7gKsBe5Jd8jF-9">
+          <mxGeometry x="-0.9535" y="-10" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-12" value="Explicitly Ignore Namespace?" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;spacingLeft=5;spacingRight=5;" vertex="1" parent="1">
+          <mxGeometry x="270" y="620" width="140" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-5" target="eDp1Fgec7gKsBe5Jd8jF-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-17" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-15" target="eDp1Fgec7gKsBe5Jd8jF-9">
+          <mxGeometry x="-0.9661" y="-20" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-19" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-15" target="eDp1Fgec7gKsBe5Jd8jF-22">
+          <mxGeometry x="-0.6667" y="20" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="520" y="810" />
+              <mxPoint x="520" y="260" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-15" value="Namespace&lt;div&gt;matches qualifyng name regex?&lt;/div&gt;" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;spacingLeft=5;spacingRight=5;" vertex="1" parent="1">
+          <mxGeometry x="270" y="760" width="140" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-16" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-12" target="eDp1Fgec7gKsBe5Jd8jF-15">
+          <mxGeometry x="-0.6667" y="20" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-18" value="Discover all services in namespace" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="600" y="320" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-27" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-20" target="eDp1Fgec7gKsBe5Jd8jF-34">
+          <mxGeometry x="-0.75" y="10" relative="1" as="geometry">
+            <mxPoint x="780" y="530" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-42" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-20" target="eDp1Fgec7gKsBe5Jd8jF-41">
+          <mxGeometry x="-0.9355" y="-10" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="450" />
+              <mxPoint x="600" y="590" />
+              <mxPoint x="650" y="590" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-20" value="Are there more&lt;div&gt;services&lt;/div&gt;&lt;div&gt;to process?&lt;/div&gt;" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;spacingLeft=5;spacingRight=5;" vertex="1" parent="1">
+          <mxGeometry x="630" y="400" width="140" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-18" target="eDp1Fgec7gKsBe5Jd8jF-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-22" target="eDp1Fgec7gKsBe5Jd8jF-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-25" value="Create Class Instance" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-22" target="eDp1Fgec7gKsBe5Jd8jF-24">
+          <mxGeometry x="0.0292" y="10" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-22" value="Prepare HTTPRoute Objects placholder for this namespace" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="600" y="240" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-24" value="httproutes" style="shape=parallelogram;html=1;strokeWidth=2;perimeter=parallelogramPerimeter;whiteSpace=wrap;rounded=1;arcSize=12;size=0.23;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="230" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-28" value="Add&lt;div&gt;HTTPRoute Object&lt;/div&gt;&lt;div&gt;for Annotated&lt;/div&gt;&lt;div&gt;Service&lt;/div&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.25;entryY=1;entryDx=0;entryDy=0;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-26" target="eDp1Fgec7gKsBe5Jd8jF-24">
+          <mxGeometry x="0.6279" y="55" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1215" y="540" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-26" target="eDp1Fgec7gKsBe5Jd8jF-29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-26" value="Parse Service Annotations" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="960" y="520" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-31" value="Create&lt;div&gt;or Delete&lt;/div&gt;&lt;div&gt;HTTPRoute&lt;/div&gt;&lt;div&gt;Object(s)&lt;/div&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-29" target="eDp1Fgec7gKsBe5Jd8jF-24">
+          <mxGeometry x="-0.8095" y="-30" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-29" value="Reconcile (process)" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="960" y="610" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-32" value="The class will maintain the list of discovered HTTPRoute object and refresh the discovery within the namespace after each action." style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1010" y="100" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-33" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;rounded=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-24" target="eDp1Fgec7gKsBe5Jd8jF-32">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1020" y="370" as="sourcePoint" />
+            <mxPoint x="1070" y="320" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-35" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-34" target="eDp1Fgec7gKsBe5Jd8jF-26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-44" value="Add&lt;div&gt;Service Name&lt;/div&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;dashed=1;jumpStyle=arc;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-34" target="eDp1Fgec7gKsBe5Jd8jF-36">
+          <mxGeometry x="-0.3043" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1000" y="490" />
+              <mxPoint x="880" y="490" />
+              <mxPoint x="880" y="670" />
+              <mxPoint x="1057" y="670" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-34" value="Update dicovered service list" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="960" y="430" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-36" value="discovered&lt;div&gt;service&lt;/div&gt;&lt;div&gt;names&lt;/div&gt;" style="shape=parallelogram;html=1;strokeWidth=2;perimeter=parallelogramPerimeter;whiteSpace=wrap;rounded=1;arcSize=12;size=0.23;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="690" width="115" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-40" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;entryPerimeter=0;jumpStyle=arc;jumpSize=12;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-29" target="eDp1Fgec7gKsBe5Jd8jF-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-45" value="Is HTTPRoute Object&lt;div&gt;linked to a service?&lt;/div&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.25;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-41" target="eDp1Fgec7gKsBe5Jd8jF-36">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="825" y="710" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-46" value="Get all HTTPRoute Objects" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-41" target="eDp1Fgec7gKsBe5Jd8jF-24">
+          <mxGeometry x="-0.6784" y="10" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="830" y="720" />
+              <mxPoint x="830" y="800" />
+              <mxPoint x="1320" y="800" />
+              <mxPoint x="1320" y="260" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-47" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="eDp1Fgec7gKsBe5Jd8jF-41" target="eDp1Fgec7gKsBe5Jd8jF-9">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="880" />
+              <mxPoint x="50" y="880" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eDp1Fgec7gKsBe5Jd8jF-41" value="Remove all remaining HTTPRoute objects in the namespace not linked to a service" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;spacingLeft=5;spacingRight=5;" vertex="1" parent="1">
+          <mxGeometry x="600" y="680" width="200" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="HJAQcIg-gkPc93V-H9xU" name="Page-2">
+    <mxGraphModel dx="1434" dy="835" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
