@@ -170,6 +170,12 @@ A couple of manifests are included that can be used to exercise the various comp
 > [!WARNING]
 > The examples use the domain `example.com` but please be aware that you need to update this to a domain that you own. Also keep in mind that the examples assume a domain managed by AWS Route 53 - some modifications may be required to fit other use cases.
 
+For the tests to be carried out, ensure the pipeline is run to deploy the controller and web hooks:
+
+```bash
+kubectl apply -f admission_webhooks/tekton/k3s_local_development/01_create_admission_webhook_application_deployment.yaml
+```
+
 ### Testing the validating webhook
 
 The validation webhook reacts to creation or updates to any `HTTProute` object. It will enforce some basic rules to prevent casual deployment and/or updates to these objects outside of the controller.

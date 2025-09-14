@@ -27,7 +27,7 @@ spec:
           project: default
           source:
             repoURL: https://github.com/nicc777/kubernetes-recipes.git
-            targetRevision: 3-finish-admission-webhooks
+            targetRevision: main
             path: admission_webhooks/charts/auto_httproute
             helm:
               valuesObject:
