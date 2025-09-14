@@ -1,0 +1,228 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: auto-httproute-create-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+    - name: shared-data
+      mountPath: /data/general
+  steps:
+    - name: prepare-application-manifest
+      image: bitnami/kubectl:latest
+      script: |
+        #!/usr/bin/env bash
+        cat <<EOF > $(workspaces.shared-data.path)/admission-webhook-application.yaml
+        apiVersion: argoproj.io/v1alpha1
+        kind: Application
+        metadata:
+          name: auto-httproute-admission-webhooks
+          namespace: argocd
+          finalizers:
+            - resources-finalizer.argocd.argoproj.io
+          labels:
+            name: admission-webhooks
+        spec:
+          project: default
+          source:
+            repoURL: https://github.com/nicc777/kubernetes-recipes.git
+            targetRevision: main
+            path: admission_webhooks/charts/auto_httproute
+            helm:
+              valuesObject:
+                applicationSettings:
+                  webhooks:
+                    tlsEnabled: 1
+                    debug: 1
+                  controller:
+                    debug: 1
+              skipCrds: false
+              skipSchemaValidation: false
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: default
+          info:
+            - name: 'Repo:'
+              value: 'https://github.com/nicc777/kubernetes-recipes'
+          syncPolicy:
+            automated:
+              # enable: true
+              prune: true
+              selfHeal: true
+              allowEmpty: false
+            syncOptions:
+            - Validate=false
+            - CreateNamespace=false
+            - PrunePropagationPolicy=foreground
+            - PruneLast=true
+            - RespectIgnoreDifferences=true
+            - ApplyOutOfSyncOnly=true
+            - SkipDryRunOnMissingResource=true
+            - Replace=true
+            retry:
+              limit: 5
+              backoff:
+                duration: 5s
+                factor: 2
+                maxDuration: 3m
+          revisionHistoryLimit: 10
+
+        EOF
+    - name: deploy-application
+      image: bitnami/kubectl:latest
+      script: |
+        #!/usr/bin/env bash
+        kubectl apply -f $(workspaces.shared-data.path)/admission-webhook-application.yaml
+        sleep 60
+    - name: create-webhook-configuration
+      image: bitnami/kubectl:latest
+      script: |
+        #!/usr/bin/env bash
+        export CA_BUNDLE=$(kubectl get secret auto-httproute-cert -n default -o jsonpath='{.data.ca\.crt}')
+        cat <<EOF > $(workspaces.shared-data.path)/validating-webhook-configuration.yaml
+        apiVersion: admissionregistration.k8s.io/v1
+        kind: ValidatingWebhookConfiguration
+        metadata:
+          name: auto-httproute-validating-hook-configuration
+        webhooks:
+        - name: auto-httproute-validating-hook.example.com
+          clientConfig:
+            service:
+              namespace: default
+              name: auto-httproute-validating-webhook
+              path: /validate
+              port: 8443
+            caBundle: $CA_BUNDLE
+          rules:
+          - apiGroups:   ["gateway.networking.k8s.io"]
+            apiVersions: ["v1", "gateway.networking.k8s.io/v1"]
+            operations:  ["CREATE", "UPDATE"]
+            resources:   ["httproutes"]
+          admissionReviewVersions: ["v1"]
+          sideEffects: None
+          timeoutSeconds: 5
+          failurePolicy: Fail
+        EOF
+
+        cat <<EOF > $(workspaces.shared-data.path)/mutating-webhook-configuration.yaml
+        apiVersion: admissionregistration.k8s.io/v1
+        kind: MutatingWebhookConfiguration
+        metadata:
+          name: auto-httproute-mutating-hook-configuration
+        webhooks:
+        - name: auto-httproute-mutating-hook.example.com
+          clientConfig:
+            service:
+              namespace: default
+              name: auto-httproute-mutating-webhook
+              path: /mutate
+              port: 8443
+            caBundle: $CA_BUNDLE
+          rules:
+          - apiGroups:   [""]
+            apiVersions: ["v1"]
+            operations:  ["CREATE", "UPDATE"]
+            resources:   ["namespaces"]
+          failurePolicy: Fail
+          sideEffects: None
+          admissionReviewVersions: ["v1"]
+          timeoutSeconds: 5
+        EOF
+    - name: register-webhook
+      image: bitnami/kubectl:latest
+      script: |
+        #!/usr/bin/env bash
+        kubectl apply -f $(workspaces.shared-data.path)/validating-webhook-configuration.yaml
+        kubectl apply -f $(workspaces.shared-data.path)/mutating-webhook-configuration.yaml
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: auto-httproute-create-end-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+    - name: shared-data
+      mountPath: /data/general
+  steps:
+    - name: get-ca-bundle-data
+      image: bitnami/kubectl:latest
+      script: |
+        #!/usr/bin/env bash
+        echo "----------------------------------------"
+        kubectl get secrets -n default
+        echo "----------------------------------------"
+        # export CA_BUNDLE=$(kubectl get secret auto-httproute-cert -n default -o jsonpath='{.data.ca\.crt}')
+        # echo "CA Bundle:"
+        # echo
+        # echo $CA_BUNDLE
+        # echo "----------------------------------------"
+    - name: print-done-message
+      image: bitnami/kubectl:latest
+      script: |
+        #!/usr/bin/env bash
+        echo "----------------------------------------"
+        echo "Created Files:"
+        echo "----------------------------------------"
+        echo
+        ls -lahrt $(workspaces.shared-data.path)/*.yaml
+        echo
+        echo "----------------------------------------"
+        echo "Namespaces:"
+        echo "----------------------------------------"
+        echo
+        kubectl get namespaces
+        echo
+        echo "----------------------------------------"
+        echo "ArgoCD Applications:"
+        echo "----------------------------------------"
+        echo
+        kubectl get applications -n argocd
+        echo
+        echo "----------------------------------------"
+        echo "Admission Web Hook Application:"
+        echo "----------------------------------------"
+        echo
+        kubectl describe application/auto-httproute-admission-webhooks -n argocd
+        echo
+        echo "----------------------------------------"
+        echo
+        echo "DONE !!!"
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: auto-httproute-admission-webhook-create-pipeline
+  namespace: bootstrapping
+spec:
+  workspaces:
+    - name: shared-data
+  tasks:
+    - name: run-auto-httproute-create-task
+      taskRef:
+        name: auto-httproute-create-task
+      workspaces:
+        - name: shared-data
+    - name: run-auto-httproute-create-end-task
+      runAfter:
+        - run-auto-httproute-create-task
+      taskRef:
+        name: auto-httproute-create-end-task
+      workspaces:
+        - name: shared-data
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: auto-httproute-admission-webhook-create-run
+  namespace: bootstrapping
+spec:
+  serviceAccountName: tekton-cluster-admin-sa
+  pipelineRef:
+    name: auto-httproute-admission-webhook-create-pipeline
+  workspaces:
+    - name: shared-data
+      persistentVolumeClaim:
+        claimName: shared-task-storage

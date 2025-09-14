@@ -1,0 +1,44 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: auto-httproute-sa
+  namespace: {{ .Values.namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: auto-httproute-cr
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "watch", "list", "patch"]
+  - apiGroups: ["gateway.networking.k8s.io", "v1"]
+    resources: ["httproutes"]
+    verbs:
+      [
+        "get",
+        "watch",
+        "list",
+        "create",
+        "patch",
+        "update",
+        "delete",
+        "deletecollection",
+      ]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: auto-httproute-cr-sa-binding
+subjects:
+  - kind: ServiceAccount
+    name: auto-httproute-sa
+    namespace: {{ .Values.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: auto-httproute-cr
+  apiGroup: rbac.authorization.k8s.io

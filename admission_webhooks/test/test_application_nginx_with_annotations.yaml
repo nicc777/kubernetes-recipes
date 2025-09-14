@@ -1,0 +1,48 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-app
+  labels:
+    name: test-app
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  namespace: test-app
+  labels:
+    app: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+---
+# Start be routing both HTTP and HTTPS traffic to the backend.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  namespace: test-app
+  annotations:
+    auto-httproute.1.target-port: private-gateway/nginx-gateway/http/test-app.example.com/80
+    auto-httproute.2.target-port: private-gateway/nginx-gateway/https/test-app.example.com/80
+spec:
+  selector:
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: ClusterIP

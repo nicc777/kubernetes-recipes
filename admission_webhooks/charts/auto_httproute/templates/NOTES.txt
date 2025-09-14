@@ -1,0 +1,40 @@
+Application Deployed
+--------------------
+
+{{- if gt ( int .Values.applicationSettings.tlsEnabled ) 0 }}
+TLS Enabled - Admission controllers deployed.
+
+When you deploy a Service resource with the desired annotations, an HTTPRoute object will automatically be created.
+
+Annotations:
+
+  auto-httproute/expose-public: true                      # Default=false. If HTTPRoute objects link to this service, the 
+                                                  # deployment/update of this service will be denied. Also, new 
+                                                  # HTTPRoute objects will be denied.
+
+  auto-httproute/public-record-name: test                 # [REQUIRED, if service is publicly exposed] 
+
+  auto-httproute/service-target-port: 80                  # [REQUIRED, is services have multiple port definitions] Indicate
+                                                  # which is the HTTP port. Service HTTPS end-points are not yet
+                                                  # supported.
+
+  auto-httproute/skip-http-route-to-https-actions: false  # Default=false. If true, the HTTPRoute object allowing HTTP traffic
+                                                  # to the service will be allowed, otherwise a redirect to HTTP will
+                                                  # be enforced
+
+  auto-httproute/skip-mutation: false                     # Default=false. If set to true, the mutating web hook will not
+                                                  # create HTTPRoute objects. Set this to true if you are providing
+                                                  # your own HTTPRoute manifests.
+
+  auto-httproute/gateway-name: private-gateway            # Default=private-gateway
+
+  auto-httproute/gateway-http-section-name: http          # Default=http
+
+  auto-httproute/gateway-https-section-name: https        # Default=https
+
+  auto-httproute/domain-name: null                        # [REQUIRED, if service is publicly exposed] add the domain name, for
+                                                  # example "example.com". The final hostname will therefore be 
+                                                  # "test.example.com" (based on the public record name annotation.)
+{{- else }}
+WARNING: TLS was NOT enabled, and therefore the admission controllers were NOT deployed.
+{{- end }}

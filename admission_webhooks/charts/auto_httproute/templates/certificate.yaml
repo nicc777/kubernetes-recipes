@@ -1,0 +1,30 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Chart.Name }}-webhook-issuer
+  namespace: {{ .Values.namespace }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Chart.Name }}-webhook-cert
+  namespace: {{ .Values.namespace }}
+spec:
+  {{- $firstItem := index .Values.tlsVolumes.volumes 0 }}
+  secretName: {{ $firstItem.secret.secretName }}
+  issuerRef:
+    name: {{ .Chart.Name }}-webhook-issuer
+    kind: Issuer
+  commonName: webhook.{{ .Values.namespace }}.svc
+  dnsNames:
+    - {{ .Chart.Name }}-validating-webhook.{{ .Values.namespace }}.svc
+    - {{ .Chart.Name }}-validating-webhook.{{ .Values.namespace }}.svc.cluster.local
+    - {{ .Chart.Name }}-mutating-webhook.{{ .Values.namespace }}.svc
+    - {{ .Chart.Name }}-mutating-webhook.{{ .Values.namespace }}.svc.cluster.local
+  usages:
+    - server auth
+
+

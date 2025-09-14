@@ -1,0 +1,1193 @@
+---
+# Using a local filesystem as per K3s example:
+# https://docs.k3s.io/storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-task-storage
+  namespace: bootstrapping
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: prepare-helm-executable
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: check-helm
+    image: debian:bookworm
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      mkdir -p $XDG_CACHE_HOME || true
+      chmod 777 $XDG_CACHE_HOME
+      FILE=$(workspaces.shared-data.path)/helm
+      if [ -f "$FILE" ]; then
+        echo "Helm Executable is available..."
+      else
+        apt update && apt install -y wget
+        wget https://get.helm.sh/helm-v3.17.4-linux-amd64.tar.gz
+        tar xzf helm-v3.17.4-linux-amd64.tar.gz
+        mv -vf linux-amd64/helm $(workspaces.shared-data.path)/helm
+        echo "Helm installed"
+      fi
+      $FILE version
+      count=$($FILE version | grep version | wc -l)
+      if [ "$count" -eq 0 ]; then
+        echo "Error: Seems helm somehow failed to install" >&2
+        exit 1
+      fi
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: nfs-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-values
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "Creating values file..."
+      export NFS_SERVER=$(head -n 1 $(workspaces.ws-env.path)/NFS_SERVER)
+      export NFS_PATH=$(head -n 1 $(workspaces.ws-env.path)/NFS_PATH)
+      cat <<EOF > $(workspaces.shared-data.path)/nfs-values.yaml
+      nfs:
+        server: ${NFS_SERVER}
+        path: ${NFS_PATH}
+        mountOptions:
+        - nfsvers=4
+      EOF
+      ls -lahrt $(workspaces.shared-data.path)/nfs-values.yaml
+      echo
+      echo "----------------------------------------"
+      cat $(workspaces.shared-data.path)/nfs-values.yaml
+      echo
+      echo "----------------------------------------"
+      # DONE
+  - name: validate-current-storage-classes
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      count=$(kubectl get storageclasses | grep -v NAME | grep nfs | wc -l)
+      if [ "$count" -eq 0 ]; then
+        touch $(workspaces.shared-data.path)/do_nfs_install
+      fi
+  - name: install-nfs
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      FILE="$(workspaces.shared-data.path)/do_nfs_install"
+      export HELM=$(workspaces.shared-data.path)/helm
+      echo "----------------------------------------"
+      ls -lahrt $XDG_CACHE_HOME/
+      echo "----------------------------------------"
+      ls -lahrt $(workspaces.shared-data.path)/
+      echo "----------------------------------------"
+      env
+      echo "----------------------------------------"
+      if [ -f "$FILE" ]; then
+        $HELM repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+        $HELM repo update
+        $HELM install nfs nfs-subdir-external-provisioner/nfs-subdir-external-provisioner --create-namespace -n nfs -f $(workspaces.shared-data.path)/nfs-values.yaml
+        echo "Sleeping 30 seconds to allow the StorageClass to be created..."
+        sleep 30
+      else
+        echo "The NFS Storage class may already be installed. Skipping installation."
+        exit 0
+      fi
+      echo "Installation of the NFS StorageClass Completed"
+  - name: validate-nfs-storageclass-is-available
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl get storageclasses
+      loop_count=0
+      MAX_ITERATIONS=10
+      SUCCEEDED=0
+      while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
+        sleep 10
+        ((loop_count++))
+        echo "Validation iteration #${loop_count}..."
+        count=$(kubectl get storageclasses | grep -v NAME | grep nfs |  wc -l)
+        if [ "$count" -eq 1 ]; then
+          SUCCEEDED=1
+          loop_count=9999
+        fi
+      done
+      if [ "$SUCCEEDED" -eq 0 ]; then
+        echo "Error: Seems the NFS StorageClass somehow failed to install" >&2
+        exit 1
+      fi
+      echo "NFS Storage Class Installed"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: nginx-gateway-fabric-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: install-ngf-required-crds
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=v1.6.2" | kubectl apply -f -
+  - name: prepare-values
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      cat <<EOF > $(workspaces.shared-data.path)/ngf-values.yaml
+      nginx:
+        service:
+          type: NodePort
+          nodePorts:
+          - port: 30080
+            listenerPort: 80
+          - port: 30443
+            listenerPort: 443
+      EOF
+  - name: install-ngf
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      ls -lahrt $(workspaces.shared-data.path)/
+      export HELM=$(workspaces.shared-data.path)/helm
+      $HELM install ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric --create-namespace -n nginx-gateway -f $(workspaces.shared-data.path)/ngf-values.yaml
+      loop_count=0
+      MAX_ITERATIONS=10
+      SUCCEEDED=0
+      while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
+        sleep 10
+        ((loop_count++))
+        echo "Validation iteration #${loop_count}..."
+        # We just need at least ONE pod running
+        count=$(kubectl get pods -n nginx-gateway | grep ngf-nginx-gateway-fabric | grep Running | head -1 | wc -l)
+        if [ "$count" -eq 1 ]; then
+          SUCCEEDED=1
+          loop_count=9999
+        fi
+      done
+      if [ "$SUCCEEDED" -eq 0 ]; then
+        echo "Error: Seems the Nginx Gateway Farbic somehow failed to install" >&2
+        exit 1
+      fi
+      echo "Installation of the Nginx Gateway Fabric Completed"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: install-cert-manager-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-cert-manager-manifest
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      cat <<EOF > $(workspaces.shared-data.path)/k3s_cert_manager.yaml
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChart
+      metadata:
+        name: cert-manager
+        namespace: kube-system
+      spec:
+        chart: oci://quay.io/jetstack/charts/cert-manager
+        version: v1.18.2
+        targetNamespace: cert-manager
+        createNamespace: true
+        valuesContent: |-
+          crds:
+            enabled: true
+      EOF
+  - name: install-cert-manager
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl apply -f $(workspaces.shared-data.path)/k3s_cert_manager.yaml
+  - name: validate-cert-manager-installation
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      sleep 60
+      loop_count=0
+      MAX_ITERATIONS=10
+      SUCCEEDED=0
+      while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
+        sleep 10
+        ((loop_count++))
+        echo "Validation iteration #${loop_count}..."
+        # We just need at least ONE pod running
+        count=$(kubectl get pods -n cert-manager | grep -v NAME | egrep -v "NAME|cainjector|webhook" | grep "cert-manager-" | grep Running | head -1 | wc -l)
+        if [ "$count" -eq 1 ]; then
+          SUCCEEDED=1
+          loop_count=9999
+        fi
+      done
+      if [ "$SUCCEEDED" -eq 0 ]; then
+        kubectl get pods -n cert-manager
+        echo "Error: Seems cert-manager somehow failed to install" >&2
+        exit 1
+      fi
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: certificate-generation
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-manifests-for-certificate-generation
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export ID=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_RESOURCE_ID)
+      export DOMAIN=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_DOMAIN)
+      export SECRET_NAME="${ID}-route53-creds-secret"
+      export CLUSTER_ISSUER_NAME="letsencrypt-${ID}"
+      export ISSUER_ACCOUNT_KEY_NAME="${ID}-issuer-account-key"
+      export ACCESS_KEY=$(head -1 $(workspaces.ws-env.path)/LE_R53_KEY)
+      export SECRET_KEY=$(head -1 $(workspaces.ws-env.path)/LE_R53_SECRET)
+      export EMAIL=$(head -1 $(workspaces.ws-env.path)/EMAIL)
+      export DNS_NAME_1=$DOMAIN
+      export DNS_NAME_2="*.${DOMAIN}"
+      export ISSUER_URL=$(head -1 $(workspaces.ws-env.path)/ISSUER_URL)
+      cat <<EOF > $(workspaces.shared-data.path)/k3s_certificates.yaml
+      ---
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: $SECRET_NAME
+        namespace: cert-manager
+      type: Opaque
+      stringData:
+        access-key-id: $ACCESS_KEY
+        secret-access-key: $SECRET_KEY
+      ---
+      apiVersion: cert-manager.io/v1
+      kind: ClusterIssuer
+      metadata:
+        name: $CLUSTER_ISSUER_NAME
+        namespace: cert-manager
+      spec:
+        acme:
+          email: $EMAIL
+          server: $ISSUER_URL
+          privateKeySecretRef:
+            name: $ISSUER_ACCOUNT_KEY_NAME
+          solvers:
+          - dns01:
+              route53:
+                region: eu-central-1
+                accessKeyIDSecretRef:
+                  name: $SECRET_NAME
+                  key: access-key-id
+                secretAccessKeySecretRef:
+                  name: $SECRET_NAME
+                  key: secret-access-key
+      ---
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      metadata:
+        name: wildcard-${ID}-certificate
+        namespace: nginx-gateway
+      spec:
+        secretName: wildcard-${ID}-tls-secret
+        issuerRef:
+          name: letsencrypt-${ID}
+          kind: ClusterIssuer
+          group: cert-manager.io
+        dnsNames:
+          - "$DNS_NAME_1"
+          - "$DNS_NAME_2"
+      EOF
+      echo "----------------------------------------"
+      cat $(workspaces.shared-data.path)/k3s_certificates.yaml
+      echo "----------------------------------------"
+  - name: apply-certificate-manifest
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl apply -f $(workspaces.shared-data.path)/k3s_certificates.yaml
+      echo "Waiting for certificate to be in a ready state... (maximum 15 minutes approx.)" 
+      loop_count=0
+      MAX_ITERATIONS=90
+      SUCCEEDED=0
+      while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
+        sleep 10
+        ((loop_count++))
+        echo "Validation iteration #${loop_count}..."
+        # The certificate must get to a True status...
+        count=$(kubectl get certificates -n nginx-gateway 2>/dev/null | grep -v NAME | grep "wildcard-" | grep "True" | wc -l)
+        if [ "$count" -eq 1 ]; then
+          SUCCEEDED=1
+          loop_count=9999
+        fi
+      done
+      echo "----------------------------------------"
+      kubectl get certificates -n nginx-gateway
+      if [ "$SUCCEEDED" -eq 0 ]; then
+        echo "----------------------------------------"
+        kubectl get pods -n cert-manager
+        echo "----------------------------------------"
+        kubectl describe certificate/wildcard-toetzen-nl-certificate -n nginx-gateway
+        echo "----------------------------------------"
+        echo "Error: Seems cert-manager somehow failed to install" >&2
+        rm -vf $(workspaces.shared-data.path)/certificate_installed || true
+        echo "----------------------------------------"
+        echo "Manifest Content"
+        echo "----------------------------------------"
+        cat $(workspaces.shared-data.path)/k3s_certificates.yaml
+        exit 0
+      fi
+      touch $(workspaces.shared-data.path)/certificate_installed
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: deploy-primary-gateway
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-manifest
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export ID=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_RESOURCE_ID)
+      cat <<EOF > $(workspaces.shared-data.path)/k3s_gateway.yaml
+      ---
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata:
+        name: private-gateway
+        namespace: nginx-gateway
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-$ID
+      spec:
+        gatewayClassName: nginx
+        listeners:
+        - name: http
+          port: 80
+          protocol: HTTP
+          allowedRoutes:
+            namespaces:
+              from: Selector
+              selector:
+                matchLabels:
+                  shared-gateway-access: "true"
+        - name: https
+          port: 443
+          protocol: HTTPS
+          tls:
+            mode: Terminate
+            certificateRefs:
+            - kind: Secret
+              group: ""
+              name: wildcard-${ID}-tls-secret
+          allowedRoutes:
+            namespaces:
+              from: Selector
+              selector:
+                matchLabels:
+                  shared-gateway-access: "true"
+      EOF
+      echo "----------------------------------------"
+      cat $(workspaces.shared-data.path)/k3s_gateway.yaml
+      echo "----------------------------------------"
+  - name: apply-gateway-manifest
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      FILE=$(workspaces.shared-data.path)/certificate_installed
+      if [ -f "$FILE" ]; then
+        kubectl apply -f $(workspaces.shared-data.path)/k3s_gateway.yaml
+        echo "----------------------------------------"
+        sleep 10  
+        kubectl get gateways -n nginx-gateway
+        echo "----------------------------------------"
+        sleep 10
+        kubectl describe gateway/private-gateway -n nginx-gateway
+      else
+        echo "Because there was an issue with the certificate provisioning, the Gateway resources will not be installed."
+        exit 0
+      fi
+
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: create-gateway-routes
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-manifest-template
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      cat <<EOF > $(workspaces.shared-data.path)/route.yaml
+      ---
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: __ROUTE_NAME__
+        namespace: __NAMESPACE__
+      spec:
+        parentRefs:
+        - name: private-gateway
+          sectionName: http
+          namespace: nginx-gateway
+        - name: private-gateway
+          sectionName: https
+          namespace: nginx-gateway
+        hostnames:
+        - "__TARGET_HOSTNAME__"
+        rules:
+        - matches:
+          - path:
+              type: PathPrefix
+              value: /
+          backendRefs:
+          - name: __SERVICE_NAME__
+            port: __PORT__
+
+      EOF
+  - name: apply-routes
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      FILE=$(workspaces.shared-data.path)/certificate_installed
+      if [ -f "$FILE" ]; then
+        echo "Applying routes..."
+      else
+        echo "Because there was an issue with the certificate provisioning, the HTTPRoute resources will not be installed."
+        exit 0
+      fi
+
+      sleep 3
+      export DOMAIN=$(head -n 1 $(workspaces.ws-env.path)/ROUTE_53_DOMAIN)
+      export ROUTES=$(head -n 1 $(workspaces.ws-env.path)/ROUTES)
+      OLD_IFS=$IFS
+      IFS=":"
+      for ROUTE in $ROUTES; do
+        echo "----------------------------------------"
+        echo "Processing Data:  ${ROUTE}"
+        IFS=','
+        read -r RECORD NAMESPACE SERVICE_NAME PORT <<< "$ROUTE"
+        ROUTE_NAME="${RECORD}-route"
+        echo "   record       : ${RECORD}"
+        echo "   namespace    : ${NAMESPACE}"
+        echo "   service name : ${SERVICE_NAME}"
+        echo "   port         : ${PORT}"
+        echo 
+        TARGET_HOSTNAME="${RECORD}.${DOMAIN}"
+        echo "Tagging namesapce ${NAMESPACE}"
+
+        loop_count=0
+        MAX_ITERATIONS=7
+        SUCCEEDED=0
+        while [ "$loop_count" -lt "$MAX_ITERATIONS" ]; do
+          sleep 10
+          ((loop_count++))
+          echo "Validation iteration #${loop_count}..."
+          # Does the name space exist?
+          t=$(kubectl get namespaces | grep -v NAME | grep "${NAMESPACE}")
+          echo "   command output: ${t}"
+          echo
+          count=$(kubectl get namespaces | grep -v NAME | grep -w "${NAMESPACE}" | wc -l)
+          echo "   count value=${count}"
+          if [ "$count" -gt 0 ]; then
+            SUCCEEDED=1
+            loop_count=9999
+          fi
+        done
+        if [ "$SUCCEEDED" -eq 0 ]; then
+          kubectl get namespaces
+          echo "Error: Seems namespace ${NAMESPACE} does not exist yet" >&2
+          exit 1
+        fi
+
+        kubectl label namespace $NAMESPACE shared-gateway-access="true" --overwrite
+        echo
+        echo "Preparing Template"
+        cp -vf $(workspaces.shared-data.path)/route.yaml $(workspaces.shared-data.path)/route-working.yaml
+        sed -i "s/__ROUTE_NAME__/${ROUTE_NAME}/g"  $(workspaces.shared-data.path)/route-working.yaml
+        sed -i "s/__NAMESPACE__/${NAMESPACE}/g"  $(workspaces.shared-data.path)/route-working.yaml
+        sed -i "s/__TARGET_HOSTNAME__/${TARGET_HOSTNAME}/g"  $(workspaces.shared-data.path)/route-working.yaml
+        sed -i "s/__SERVICE_NAME__/${SERVICE_NAME}/g"  $(workspaces.shared-data.path)/route-working.yaml
+        sed -i "s/__PORT__/${PORT}/g"  $(workspaces.shared-data.path)/route-working.yaml
+        echo "--- TEMPLATE ---"
+        cat $(workspaces.shared-data.path)/route-working.yaml
+        echo "--- /TEMPLATE ---"
+        echo
+        echo "Deleting any previous routes"
+        kubectl delete HTTPRoute/$ROUTE_NAME -n $NAMESPACE || true
+        echo
+        echo "Creating route"
+        sleep 3
+        kubectl apply -f $(workspaces.shared-data.path)/route-working.yaml
+      done
+      IFS=$OLD_IFS
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: deploy-argocd
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-for-deployment
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      cat <<EOF > $(workspaces.shared-data.path)/fix_for_ingress.yaml
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        labels:
+          app.kubernetes.io/name: argocd-cmd-params-cm
+          app.kubernetes.io/part-of: argocd
+        name: argocd-cmd-params-cm
+        namespace: argocd
+      data:
+        server.insecure: "true"
+      EOF
+      kubectl delete -f $(workspaces.shared-data.path)/fix_for_ingress.yaml || true
+      kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.0.12/manifests/install.yaml || true
+      kubectl delete namespace argocd || true
+  - name: deploy-argocd
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      kubectl create namespace argocd
+      kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.0.12/manifests/install.yaml
+      sleep 30
+      PW=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo)
+      echo "----------------------------------------"
+      echo
+      echo "PASSWORD: ${PW}"
+      echo
+      echo "----------------------------------------"
+      kubectl apply -f $(workspaces.shared-data.path)/fix_for_ingress.yaml
+      kubectl rollout restart deployment argocd-server -n argocd
+      echo
+      echo "                    DONE"
+      echo
+      echo "----------------------------------------"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: kube-prometheus-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: install-helm
+    image: debian:bookworm
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      export HELM=$(workspaces.shared-data.path)/helm
+      if [ -f "$HELM" ]; then
+        echo "Helm Executable is available..."
+      else
+        apt update && apt install -y wget ca-certificates
+        update-ca-certificates
+        wget https://get.helm.sh/helm-v3.17.4-linux-amd64.tar.gz
+        tar xzf helm-v3.17.4-linux-amd64.tar.gz
+        mv -vf linux-amd64/helm $(workspaces.shared-data.path)/helm
+        echo "Helm installed"
+      fi
+      $HELM version
+      count=$($HELM version | grep version | wc -l)
+      if [ "$count" -eq 0 ]; then
+        echo "Error: Seems helm somehow failed to install" >&2
+        exit 1
+      fi
+  - name: install-kube-prometheus
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      export HELM=$(workspaces.shared-data.path)/helm
+      $HELM install kube-prometheus oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack --create-namespace -n kube-prometheus
+      echo "----------------------------------------"
+      echo
+      export ADMIN_PASSWORD=$(kubectl --namespace kube-prometheus get secrets kube-prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo)
+      echo "   PASSWORD: ${ADMIN_PASSWORD}"
+      echo
+      echo "----------------------------------------"
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitea-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: prepare-volumes-gitea
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "See https://gitea.com/gitea/helm-gitea for details..."
+      export NFS_SERVER=$(head -n 1 $(workspaces.ws-env.path)/NFS_SERVER)
+      export NFS_PATH=$(head -n 1 $(workspaces.ws-env.path)/NFS_PATH)
+      cat <<EOF > $(workspaces.shared-data.path)/gitea_volumes.yaml
+      ---
+      apiVersion: v1
+      kind: PersistentVolume
+      metadata:
+        name: nfs-gitea-pv
+        namespace: devops
+      spec:
+        capacity:
+          storage: 10Gi
+        volumeMode: Filesystem
+        accessModes:
+        - ReadWriteMany
+        persistentVolumeReclaimPolicy: Retain
+        storageClassName: nfs-gitea-data
+        nfs:
+          path: ${NFS_PATH}/gitea-main
+          server: ${NFS_SERVER}
+      ---
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: nfs-gitea-pvc
+        namespace: devops
+      spec:
+        accessModes:
+        - ReadWriteMany
+        storageClassName: nfs-gitea-data
+        resources:
+          requests:
+            storage: 10Gi
+      EOF
+  - name: prepare-postgres
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "See https://gitea.com/gitea/helm-gitea for details..."
+      export NFS_SERVER=$(head -n 1 $(workspaces.ws-env.path)/NFS_SERVER)
+      export NFS_PATH=$(head -n 1 $(workspaces.ws-env.path)/NFS_PATH)
+      cat <<EOF > $(workspaces.shared-data.path)/gitea_db.yaml
+      ---
+      apiVersion: v1
+      kind: PersistentVolume
+      metadata:
+        name: nfs-gitea-db-pv
+        namespace: devops
+      spec:
+        capacity:
+          storage: 15Gi
+        volumeMode: Filesystem
+        accessModes:
+        - ReadWriteMany
+        persistentVolumeReclaimPolicy: Retain
+        storageClassName: nfs-gitea-db
+        nfs:
+          The following directory needs to exist on NFS:
+          path: ${NFS_PATH}/gitea-db
+          server: ${NFS_SERVER}
+      ---
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: nfs-gitea-db-pvc
+        namespace: devops
+      spec:
+        accessModes:
+        - ReadWriteMany
+        storageClassName: nfs-gitea-db
+        resources:
+          requests:
+            storage: 15Gi
+      ---
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: postgres-db-init
+        namespace: devops
+      data:
+        init-gitea.sh: |
+          #!/usr/bin/env bash
+          set -e
+          psql -v ON_ERROR_STOP=1 --username "\$POSTGRES_USER" --dbname "\$POSTGRES_DB" <<-EOSQL
+            CREATE USER gitea WITH LOGIN PASSWORD 'gitea-password';
+            CREATE DATABASE gitea WITH OWNER gitea TEMPLATE template0 ENCODING UTF8 LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8';
+            GRANT ALL PRIVILEGES ON DATABASE gitea TO gitea;
+          EOSQL
+          # See https://hub.docker.com/_/postgres#initialization-scripts
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: gitea-postgres
+        namespace: devops
+        labels:
+          app: gitea
+      spec:
+        ports:
+        - port: 5432
+          name: postgres
+        selector:
+          app: gitea-postgres
+      ---
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: gitea-postgres
+        namespace: devops
+      spec:
+        selector:
+          matchLabels:
+            app: gitea-postgres
+        serviceName: gitea-postgres
+        replicas: 1
+        minReadySeconds: 10
+        template:
+          metadata:
+            labels:
+              app: gitea-postgres
+          spec:
+            terminationGracePeriodSeconds: 10
+            containers:
+            - name: gitea-postgres
+              image: docker.io/postgres:17.6-bookworm
+              env:
+              - name: POSTGRES_PASSWORD
+                value: password
+              ports:
+              - containerPort: 5432
+                name: postgres
+              volumeMounts:
+              - name: postgres-data
+                mountPath: /var/lib/postgresql/data
+              - name: postgres-db-init-script
+                mountPath: /docker-entrypoint-initdb.d
+            volumes:
+            - name: postgres-data
+              persistentVolumeClaim:
+                claimName: nfs-gitea-db-pvc
+            - name: postgres-db-init-script
+              configMap:
+                name: postgres-db-init
+      ---
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: pgadmin-servers
+        namespace: devops
+      data:
+        servers.json: |
+          {
+            "Servers": {
+              "1": {
+                "Name": "Gitea DB",
+                "Group": "Gitea",
+                "Port": 5432,
+                "Username": "postgres",
+                "Host": "gitea-postgres",
+                "MaintenanceDB": "postgres",
+                "ConnectionParameters": {
+                    "connect_timeout": 10
+                }
+              }
+            }
+          }
+      ---
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: pgadmin-deployment
+        namespace: devops
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: pgadmin
+        template:
+          metadata:
+            labels:
+              app: pgadmin
+          spec:
+            containers:
+            - name: pgadmin
+              image: docker.io/dpage/pgadmin4:9.6.0
+              ports:
+              - containerPort: 80
+              env:
+              - name: PGADMIN_DEFAULT_EMAIL
+                value: admin@example.com
+              - name: PGADMIN_DEFAULT_PASSWORD
+                value: admin
+              - name: PGADMIN_SERVER_JSON_FILE
+                value: /data/extras/servers.json
+              volumeMounts:
+              - name: pgadmin-servers-volume
+                mountPath: /data/extras
+            volumes:
+            - name: pgadmin-servers-volume
+              configMap:
+                name: pgadmin-servers
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: pgadmin-service
+        namespace: devops
+      spec:
+        selector:
+          app: pgadmin
+        ports:
+        - protocol: TCP
+          port: 80
+          targetPort: 80
+
+      EOF
+
+  - name: prepare-values
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "See https://gitea.com/gitea/helm-gitea for details..."
+      export NFS_SERVER=$(head -n 1 $(workspaces.ws-env.path)/NFS_SERVER)
+      export NFS_PATH=$(head -n 1 $(workspaces.ws-env.path)/NFS_PATH)
+      cat <<EOF > $(workspaces.shared-data.path)/gitea_values.yaml
+      namespace: devops
+      replicaCount: 1
+      ingress:
+        enabled: false
+      persistence:
+        create: false
+        claimName: nfs-gitea-pvc
+      gitea:
+        config:
+          database:
+            DB_TYPE: postgres
+            HOST: "gitea-postgres:5432"
+            NAME: gitea
+            USER: gitea
+            PASSWD: gitea-password
+        admin:
+          username: gitea
+          password: gitea-password
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+      valkey-cluster:
+        enabled: false
+      valkey:
+        enabled: true
+      postgresql-ha:
+        enabled: false
+      postgresql:
+        enabled: false
+      service:
+        ssh:
+          type: NodePort
+          nodePort: 30022
+      EOF
+  - name: install-gitea-helm-chart
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      export HELM=$(workspaces.shared-data.path)/helm
+      echo "----------------------------------------"
+      echo "Cleanup Previous Artifacts..."
+      echo
+      $HELM uninstall -n devops gitea || true
+      kubectl delete -f $(workspaces.shared-data.path)/gitea_db.yaml
+      kubectl delete -f $(workspaces.shared-data.path)/gitea_volumes.yaml
+      kubectl delete pvc/nfs-gitea-pvc -n devops
+      kubectl delete pvc/valkey-data-gitea-valkey-primary-0 -n devops
+      kubectl delete namespace devops
+      echo "----------------------------------------"
+      echo "Installing Postgres and PGAdmin..."
+      echo
+      sleep 3
+      kubectl create namespace devops || true
+      kubectl apply -f $(workspaces.shared-data.path)/gitea_volumes.yaml
+      kubectl apply -f $(workspaces.shared-data.path)/gitea_db.yaml
+      echo "----------------------------------------"
+      echo "Taking a nap for a minute"
+      echo
+      sleep 60
+      echo "----------------------------------------"
+      echo "Installing Gitea via Helm"
+      echo
+      # Install Gitea
+      $HELM install gitea oci://registry-1.docker.io/giteacharts/gitea -n devops -f $(workspaces.shared-data.path)/gitea_values.yaml
+  - name: deployment-summary
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo
+      echo "----------------------------------------"
+      echo
+      echo "   Gitea Credentials:"
+      echo
+      echo "      Username : gitea"
+      echo "      Password : gitea-password"
+      echo
+      echo "----------------------------------------"
+      echo
+      echo "   PGAdmin Credentials:"
+      echo
+      echo "      Username : admin@example.com"
+      echo "      Password : admin"
+      echo
+      echo "----------------------------------------"
+      
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: end-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: print-done-message
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "----------------------------------------"
+      echo "Created Files:"
+      echo "----------------------------------------"
+      echo
+      ls -lahrt $(workspaces.shared-data.path)/*.yaml
+      echo
+      echo "----------------------------------------"
+      echo "Namespaces:"
+      echo "----------------------------------------"
+      echo
+      kubectl get namespaces
+      echo
+      echo "----------------------------------------"
+      echo "Helm Charts Installed:"
+      echo "----------------------------------------"
+      echo
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      export HELM=$(workspaces.shared-data.path)/helm
+      $HELM list --all-namespaces
+      echo
+      echo "----------------------------------------"
+      echo
+      echo "DONE !!!"
+
+# ################################################################################
+# 
+#           TEMPLATES as ConfigMap Objects 
+#
+# ################################################################################
+#
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dummy-cm
+  namespace: bootstrapping
+data:
+  test.data: tasks are my jam
+
+# ################################################################################
+# 
+#           PIPELINE 
+#
+# ################################################################################
+
+
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: bootstrap-k3s-pipeline
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: ws-env
+  - name: shared-data
+  tasks:
+  - name: run-prepare-helm-executable
+    taskRef:
+      name: prepare-helm-executable
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-nfs-task
+    runAfter:
+    - run-prepare-helm-executable
+    taskRef:
+      name: nfs-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-nginx-gateway-fabric-task
+    runAfter:
+    - run-nfs-task
+    taskRef:
+      name: nginx-gateway-fabric-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-install-cert-manager-task
+    runAfter:
+    - run-nginx-gateway-fabric-task
+    taskRef:
+      name: install-cert-manager-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-certificate-generation
+    runAfter:
+    - run-install-cert-manager-task
+    taskRef:
+      name: certificate-generation
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-deploy-primary-gateway
+    runAfter:
+    - run-certificate-generation
+    taskRef:
+      name: deploy-primary-gateway
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-deploy-argocd
+    runAfter:
+    - run-deploy-primary-gateway
+    taskRef:
+      name: deploy-argocd
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-kube-prometheus-task
+    runAfter:
+    - run-deploy-argocd
+    taskRef:
+      name: kube-prometheus-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-gitea-task
+    runAfter:
+    - run-kube-prometheus-task
+    taskRef:
+      name: gitea-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+
+  # REMEMBER to update the below task dependency once all tasks have been defined...
+  - name: run-create-gateway-routes
+    runAfter:
+    - run-gitea-task
+    taskRef:
+      name: create-gateway-routes
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-end-task
+    runAfter:
+    - run-create-gateway-routes
+    taskRef:
+      name: end-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+---
+#apiVersion: tekton.dev/v1
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: bootstrap-run
+  namespace: bootstrapping
+spec:
+  serviceAccountName: tekton-cluster-admin-sa
+  pipelineRef:
+    name: bootstrap-k3s-pipeline
+  workspaces:
+  - name: shared-data
+    persistentVolumeClaim:
+      claimName: shared-task-storage
+  - name: ws-env
+    secret:
+      secretName: env-secret

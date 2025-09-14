@@ -1,0 +1,103 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: fix-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: fix-step
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "The fixing of broken stuff is starting..."
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: end-task
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: shared-data
+    mountPath: /data/general
+  - name: ws-env
+    mountPath: /data/.env
+  steps:
+  - name: print-done-message
+    image: bitnami/kubectl:latest
+    script: |
+      #!/usr/bin/env bash
+      echo "----------------------------------------"
+      echo "Created Files:"
+      echo "----------------------------------------"
+      echo
+      ls -lahrt $(workspaces.shared-data.path)/*.yaml
+      echo
+      echo "----------------------------------------"
+      echo "Namespaces:"
+      echo "----------------------------------------"
+      echo
+      kubectl get namespaces
+      echo
+      echo "----------------------------------------"
+      echo "Helm Charts Installed:"
+      echo "----------------------------------------"
+      echo
+      export XDG_CACHE_HOME=$(workspaces.shared-data.path)/.helm_cache
+      export HELM_CONFIG_HOME=$XDG_CACHE_HOME
+      export HELM=$(workspaces.shared-data.path)/helm
+      $HELM list --all-namespaces
+      echo
+      echo "----------------------------------------"
+      echo
+      echo "DONE !!!"
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: bootstrap-k3s-pipeline-tmp
+  namespace: bootstrapping
+spec:
+  workspaces:
+  - name: ws-env
+  - name: shared-data
+  tasks:
+  - name: run-fix-task
+    taskRef:
+      name: fix-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+  - name: run-end-task
+    runAfter:
+    - run-fix-task
+    taskRef:
+      name: end-task
+    workspaces:
+    - name: ws-env
+    - name: shared-data
+---
+#apiVersion: tekton.dev/v1
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: bootstrap-run-tmp
+  namespace: bootstrapping
+spec:
+  serviceAccountName: tekton-cluster-admin-sa
+  pipelineRef:
+    name: bootstrap-k3s-pipeline-tmp
+  workspaces:
+  - name: shared-data
+    persistentVolumeClaim:
+      claimName: shared-task-storage
+  - name: ws-env
+    secret:
+      secretName: env-secret
